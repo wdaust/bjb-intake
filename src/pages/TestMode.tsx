@@ -78,8 +78,9 @@ export function TestMode() {
     }
   }
 
-  function autoRun() {
-    if (!scenario) return
+  function autoRun(targetScenario?: TestScenario) {
+    const s = targetScenario || scenario
+    if (!s) return
     // Reset
     let node = getStartNode()
     const log: typeof testLog = []
@@ -87,8 +88,8 @@ export function TestMode() {
     const data: CapturedCallData = {}
     const createdTasks: TaskItem[] = []
 
-    for (let i = 0; i < scenario.expectedAnswers.length; i++) {
-      const expected = scenario.expectedAnswers[i]
+    for (let i = 0; i < s.expectedAnswers.length; i++) {
+      const expected = s.expectedAnswers[i]
       if (node.nodeId !== expected.nodeId) {
         log.push({ step: i + 1, node: node.nodeName, answer: `MISMATCH — expected node ${expected.nodeId}, at ${node.nodeId}`, expected: false, note: 'Node path diverged' })
         break
@@ -127,8 +128,8 @@ export function TestMode() {
     setNodesVisited(visited)
     setCapturedData(data)
     setTasks(createdTasks)
+    setScenario(s)
     setTestState('complete')
-    setScenario(scenario)
   }
 
   // ============ SELECTING ============
@@ -158,7 +159,7 @@ export function TestMode() {
                   <Button size="sm" onClick={(e) => { e.stopPropagation(); startScenario(s) }}>
                     Manual Walk-Through
                   </Button>
-                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setScenario(s); setTimeout(autoRun, 0) }}>
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); autoRun(s) }}>
                     Auto-Run
                   </Button>
                 </div>
