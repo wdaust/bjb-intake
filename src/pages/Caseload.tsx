@@ -190,8 +190,50 @@ export function Caseload() {
     return sortCases(cases, sortBy)
   }, [allCases, search, sortBy, filterPreset])
 
+  // Stats
+  const urgentCount = allCases.filter(c => c.scores.urgencyScore >= 70).length
+  const gapCount = allCases.filter(c => c.operational.treatmentGapDays > 14).length
+  const noApptCount = allCases.filter(c => !c.treatment.nextAppointmentDate).length
+
+  function getInitials(name: string): string {
+    return name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
+  }
+  function getInitialColor(name: string): string {
+    const colors = ['bg-blue-500','bg-purple-500','bg-teal-500','bg-pink-500','bg-orange-500','bg-cyan-500','bg-indigo-500','bg-emerald-500','bg-rose-500','bg-amber-500']
+    let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    return colors[Math.abs(hash) % colors.length]
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 page-enter">
+      {/* Daily Stats Banner */}
+      <div className="rounded-xl border border-border/30 bg-gradient-to-r from-primary/5 via-transparent to-teal-500/5 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-6">
+            <div className="text-center">
+              <p className="text-2xl font-bold stat-number">{filteredCases.length}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cases</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-red-400 stat-number">{urgentCount}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Urgent</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-orange-400 stat-number">{gapCount}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Gap 14d+</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-yellow-400 stat-number">{noApptCount}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">No Appt</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-medium">{selectedCmName || 'All Cases'}</p>
+            <p className="text-xs text-muted-foreground">Page {page + 1} of {totalPages}</p>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Caseload</h1>
@@ -276,15 +318,20 @@ export function Caseload() {
           return (
             <Card
               key={cv.caseData.id}
-              className="cursor-pointer transition-all hover:border-primary/40 border-border/50"
+              className="cursor-pointer card-hover border-border/50"
               onClick={() => navigate(`/case/${cv.caseData.id}`)}
             >
               <CardContent className="p-4">
                 <div className="grid grid-cols-12 gap-4 items-center">
-                  {/* Name + ID */}
-                  <div className="col-span-3">
-                    <p className="font-semibold">{cv.client.fullName}</p>
-                    <p className="text-xs text-muted-foreground">{cv.caseData.matterId}</p>
+                  {/* Avatar + Name */}
+                  <div className="col-span-3 flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 ${getInitialColor(cv.client.fullName)}`}>
+                      {getInitials(cv.client.fullName)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{cv.client.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{cv.caseData.matterId}</p>
+                    </div>
                   </div>
 
                   {/* Stage + State */}

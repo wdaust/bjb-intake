@@ -34,7 +34,7 @@ export function ManagerDashboard() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 page-enter">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Manager Dashboard</h1>
         <p className="text-sm text-muted-foreground">

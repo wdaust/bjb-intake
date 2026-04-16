@@ -19,7 +19,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-background">
       {!isCallScreen && (
-        <header className="border-b border-border/50 bg-card/80 backdrop-blur-sm sticky top-0 z-50">
+        <header className="border-b border-border/50 glass sticky top-0 z-50 relative">
           <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4">
             <Link to="/" className="flex items-center gap-2">
               <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
@@ -57,6 +57,7 @@ export function Layout() {
               )}
             </div>
           </div>
+          <div className="gradient-line h-[2px] w-full absolute bottom-0 left-0" />
         </header>
       )}
       <main className={cn(
