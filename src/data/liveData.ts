@@ -420,6 +420,127 @@ export async function getTimelineLive(caseId: string): Promise<TimelineEvent[]> 
 }
 
 // ============================================================
+// Manager Dashboard — Aggregate Stats (all cases, not paginated)
+// ============================================================
+
+export interface ManagerStats {
+  totalCases: number
+  withNextAppt: number
+  stagnating: number  // treatment gap > 14d
+  highRisk: number    // urgency >= 70 (approximated)
+  avgUrgency: number
+  // Queue counts
+  noAppointmentCount: number
+  treatmentGapCount: number
+  unresolvedReferralCount: number
+  weakCaseCount: number
+  // Top cases for each queue (limited)
+  stagnationCases: { sf_id: string; display_name: string; client_name: string; gap_days: number }[]
+  noApptCases: { sf_id: string; display_name: string; client_name: string }[]
+}
+
+export async function getManagerStats(): Promise<ManagerStats> {
+  try {
+    // Run all aggregate queries in parallel
+    const [
+      totalRow,
+      gapRows,
+      noApptRow,
+      refRow,
+      weakRow,
+      stagnationList,
+    ] = await Promise.all([
+      // Total open PI cases
+      sql`SELECT COUNT(*)::int as cnt FROM sf_matters WHERE status NOT IN ('Closed', 'Resolved') AND pi_status IS NOT NULL`,
+      // Treatment gap stats from damages
+      sql`
+        SELECT
+          COUNT(DISTINCT m.sf_id)::int as total,
+          COUNT(DISTINCT CASE WHEN d.last_service < now() - interval '14 days' THEN m.sf_id END)::int as gap_14,
+          COUNT(DISTINCT CASE WHEN d.last_service < now() - interval '30 days' THEN m.sf_id END)::int as gap_30
+        FROM sf_matters m
+        LEFT JOIN (
+          SELECT matter_id, MAX(service_end_date) as last_service
+          FROM sf_damages
+          GROUP BY matter_id
+        ) d ON d.matter_id = m.sf_id
+        WHERE m.status NOT IN ('Closed', 'Resolved') AND m.pi_status IS NOT NULL
+      `,
+      // No next appointment (we don't track next appt in SF, so count matters with no recent damage)
+      sql`
+        SELECT COUNT(*)::int as cnt
+        FROM sf_matters m
+        WHERE m.status NOT IN ('Closed', 'Resolved') AND m.pi_status IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM sf_damages d WHERE d.matter_id = m.sf_id
+              AND d.service_end_date > now() - interval '30 days'
+          )
+      `,
+      // Unresolved referrals (matters with pending/failed referral-like signals — approximate from open tasks)
+      sql`
+        SELECT COUNT(DISTINCT t.matter_id)::int as cnt
+        FROM sf_tasks t
+        JOIN sf_matters m ON t.matter_id = m.sf_id
+        WHERE m.status NOT IN ('Closed', 'Resolved') AND m.pi_status IS NOT NULL
+          AND t.is_closed = false AND t.subject ILIKE '%referral%'
+      `,
+      // Weak cases (less than 3 damage records, open > 90 days)
+      sql`
+        SELECT COUNT(*)::int as cnt
+        FROM sf_matters m
+        LEFT JOIN (SELECT matter_id, COUNT(*)::int as dmg_count FROM sf_damages GROUP BY matter_id) d ON d.matter_id = m.sf_id
+        WHERE m.status NOT IN ('Closed', 'Resolved') AND m.pi_status IS NOT NULL
+          AND m.open_date < now() - interval '90 days'
+          AND COALESCE(d.dmg_count, 0) < 3
+      `,
+      // Top stagnating cases for drill-down
+      sql`
+        SELECT m.sf_id, m.display_name,
+               COALESCE(c.first_name || ' ' || c.last_name, m.display_name) as client_name,
+               EXTRACT(DAY FROM now() - d.last_service)::int as gap_days
+        FROM sf_matters m
+        LEFT JOIN sf_contacts c ON m.client_id = c.account_id
+        LEFT JOIN (SELECT matter_id, MAX(service_end_date) as last_service FROM sf_damages GROUP BY matter_id) d ON d.matter_id = m.sf_id
+        WHERE m.status NOT IN ('Closed', 'Resolved') AND m.pi_status IS NOT NULL
+          AND d.last_service < now() - interval '14 days'
+        ORDER BY d.last_service ASC NULLS FIRST
+        LIMIT 10
+      `,
+    ])
+
+    const total = (totalRow[0] as Record<string, unknown>).cnt as number
+    const gap14 = (gapRows[0] as Record<string, unknown>).gap_14 as number
+    const gap30 = (gapRows[0] as Record<string, unknown>).gap_30 as number
+
+    return {
+      totalCases: total,
+      withNextAppt: total - ((noApptRow[0] as Record<string, unknown>).cnt as number),
+      stagnating: gap14,
+      highRisk: gap30,
+      avgUrgency: total > 0 ? Math.round((gap14 / total) * 100) : 0,
+      noAppointmentCount: (noApptRow[0] as Record<string, unknown>).cnt as number,
+      treatmentGapCount: gap14,
+      unresolvedReferralCount: (refRow[0] as Record<string, unknown>).cnt as number,
+      weakCaseCount: (weakRow[0] as Record<string, unknown>).cnt as number,
+      stagnationCases: stagnationList.map((r: Record<string, unknown>) => ({
+        sf_id: r.sf_id as string,
+        display_name: r.display_name as string,
+        client_name: r.client_name as string,
+        gap_days: r.gap_days as number,
+      })),
+      noApptCases: [],
+    }
+  } catch (err) {
+    console.error('[liveData] Manager stats failed:', err)
+    return {
+      totalCases: 0, withNextAppt: 0, stagnating: 0, highRisk: 0, avgUrgency: 0,
+      noAppointmentCount: 0, treatmentGapCount: 0, unresolvedReferralCount: 0, weakCaseCount: 0,
+      stagnationCases: [], noApptCases: [],
+    }
+  }
+}
+
+// ============================================================
 // Flow Builder Persistence
 // ============================================================
 
