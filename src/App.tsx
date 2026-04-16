@@ -8,6 +8,7 @@ import { Timeline } from './pages/Timeline'
 import { PostCallSummary } from './pages/PostCallSummary'
 import { ManagerDashboard } from './pages/ManagerDashboard'
 import { TestMode } from './pages/TestMode'
+import { FlowBuilder } from './pages/FlowBuilder'
 import { useAuth } from './lib/AuthContext'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -29,6 +30,7 @@ function App() {
         <Route path="/summary/:caseId" element={<PostCallSummary />} />
         <Route path="/manager" element={<ManagerDashboard />} />
         <Route path="/test" element={<TestMode />} />
+        <Route path="/builder" element={<FlowBuilder />} />
       </Route>
     </Routes>
   )

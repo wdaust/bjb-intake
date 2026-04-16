@@ -6,6 +6,7 @@ const navItems = [
   { label: 'Caseload', path: '/' },
   { label: 'Manager Dashboard', path: '/manager' },
   { label: 'Test Mode', path: '/test' },
+  { label: 'Flow Builder', path: '/builder' },
 ]
 
 export function Layout() {
