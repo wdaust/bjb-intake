@@ -1,22 +1,34 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/layout/Layout'
+import { Login } from './pages/Login'
 import { Caseload } from './pages/Caseload'
 import { CaseSnapshot } from './pages/CaseSnapshot'
 import { GuidedCall } from './pages/GuidedCall'
 import { Timeline } from './pages/Timeline'
 import { PostCallSummary } from './pages/PostCallSummary'
 import { ManagerDashboard } from './pages/ManagerDashboard'
+import { TestMode } from './pages/TestMode'
+import { useAuth } from './lib/AuthContext'
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>
+  if (!user) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
 
 function App() {
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route path="/login" element={<Login />} />
+      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<Caseload />} />
         <Route path="/case/:caseId" element={<CaseSnapshot />} />
         <Route path="/call/:caseId" element={<GuidedCall />} />
         <Route path="/timeline/:caseId" element={<Timeline />} />
         <Route path="/summary/:caseId" element={<PostCallSummary />} />
         <Route path="/manager" element={<ManagerDashboard />} />
+        <Route path="/test" element={<TestMode />} />
       </Route>
     </Routes>
   )
