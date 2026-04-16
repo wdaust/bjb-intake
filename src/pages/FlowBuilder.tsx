@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getAllNodes } from '@/data/callFlowNodes'
+import { loadFlowNodes, saveFlowNodes } from '@/data/liveData'
 import type { CallNode, CallStage } from '@/types'
 import CallNodeComponent from '@/components/builder/CallNodeComponent'
 
@@ -99,6 +100,20 @@ export function FlowBuilder() {
   const [callNodes, setCallNodes] = useState<CallNode[]>(getAllNodes)
   const [selectedNode, setSelectedNode] = useState<CallNode | null>(null)
   const [editingNode, setEditingNode] = useState<CallNode | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [dirty, setDirty] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  // Load from DB on mount
+  useEffect(() => {
+    loadFlowNodes().then(saved => {
+      if (saved && saved.length > 0) {
+        setCallNodes(saved)
+      }
+      setLoading(false)
+    })
+  }, [])
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () => buildFlowFromNodes(callNodes),
@@ -143,6 +158,8 @@ export function FlowBuilder() {
     setCallNodes(prev => prev.map(n => n.nodeId === editingNode.nodeId ? editingNode : n))
     setSelectedNode(editingNode)
     setEditingNode(null)
+    setDirty(true)
+    setSaveStatus('idle')
   }
 
   function cancelEdit() {
@@ -174,6 +191,8 @@ export function FlowBuilder() {
     setCallNodes(prev => [...prev, newNode])
     setSelectedNode(newNode)
     setEditingNode(newNode)
+    setDirty(true)
+    setSaveStatus('idle')
   }
 
   function deleteNode(nodeId: string) {
@@ -182,6 +201,24 @@ export function FlowBuilder() {
       setSelectedNode(null)
       setEditingNode(null)
     }
+    setDirty(true)
+    setSaveStatus('idle')
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const ok = await saveFlowNodes(callNodes)
+    setSaving(false)
+    setSaveStatus(ok ? 'saved' : 'error')
+    if (ok) setDirty(false)
+  }
+
+  function handleReset() {
+    setCallNodes(getAllNodes())
+    setSelectedNode(null)
+    setEditingNode(null)
+    setDirty(true)
+    setSaveStatus('idle')
   }
 
   function exportJson() {
@@ -196,6 +233,8 @@ export function FlowBuilder() {
   }
 
   const active = editingNode || selectedNode
+
+  if (loading) return <p className="text-muted-foreground p-8">Loading flow...</p>
 
   return (
     <div className="h-[calc(100vh-80px)] flex">
@@ -228,10 +267,17 @@ export function FlowBuilder() {
             style={{ height: 120 }}
           />
           <Panel position="top-left">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <Button size="sm" onClick={handleSave} disabled={saving || !dirty}>
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
               <Button size="sm" onClick={addNewNode}>+ Add Node</Button>
               <Button size="sm" variant="outline" onClick={exportJson}>Export JSON</Button>
+              <Button size="sm" variant="outline" onClick={handleReset}>Reset to Defaults</Button>
               <Badge variant="secondary">{callNodes.length} nodes</Badge>
+              {dirty && <Badge variant="destructive" className="text-[10px]">Unsaved</Badge>}
+              {saveStatus === 'saved' && <Badge className="bg-green-500 text-[10px]">Saved</Badge>}
+              {saveStatus === 'error' && <Badge variant="destructive" className="text-[10px]">Save failed</Badge>}
             </div>
           </Panel>
         </ReactFlow>

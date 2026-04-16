@@ -161,6 +161,13 @@ CREATE TABLE IF NOT EXISTS sf_intakes (
   synced_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Call flow nodes (persisted from Flow Builder)
+CREATE TABLE IF NOT EXISTS call_flow_nodes (
+  node_id TEXT PRIMARY KEY,
+  node_data JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- View: Full case view for the app
 CREATE OR REPLACE VIEW v_case_manager_caseload AS
 SELECT

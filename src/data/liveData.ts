@@ -5,7 +5,7 @@
  */
 
 import { neon } from '@neondatabase/serverless'
-import type { FullCaseView, Client, Case, TreatmentRecord, Provider, Referral, OperationalData, CaseStage, ProviderStatus, TimelineEvent } from '@/types'
+import type { FullCaseView, Client, Case, TreatmentRecord, Provider, Referral, OperationalData, CaseStage, ProviderStatus, TimelineEvent, CallNode } from '@/types'
 import { calculateScores } from './scoringEngine'
 import { getAllCases as getMockCases, getTimeline as getMockTimeline } from './mockData'
 
@@ -416,5 +416,34 @@ export async function getTimelineLive(caseId: string): Promise<TimelineEvent[]> 
     return timeline
   } catch {
     return getMockTimeline(caseId)
+  }
+}
+
+// ============================================================
+// Flow Builder Persistence
+// ============================================================
+
+export async function loadFlowNodes(): Promise<CallNode[] | null> {
+  try {
+    const rows = await sql`SELECT node_data FROM call_flow_nodes ORDER BY node_id`
+    if (rows.length === 0) return null // no saved flow — use defaults
+    return rows.map((r: Record<string, unknown>) => r.node_data as CallNode)
+  } catch (err) {
+    console.error('[liveData] Failed to load flow nodes:', err)
+    return null
+  }
+}
+
+export async function saveFlowNodes(nodes: CallNode[]): Promise<boolean> {
+  try {
+    // Delete all existing and re-insert (simple full-replace)
+    await sql`DELETE FROM call_flow_nodes`
+    for (const node of nodes) {
+      await sql`INSERT INTO call_flow_nodes (node_id, node_data, updated_at) VALUES (${node.nodeId}, ${JSON.stringify(node)}, now())`
+    }
+    return true
+  } catch (err) {
+    console.error('[liveData] Failed to save flow nodes:', err)
+    return false
   }
 }
