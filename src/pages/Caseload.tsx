@@ -125,20 +125,27 @@ export function Caseload() {
   const [cmList, setCmList] = useState<{ id: string; name: string; role: string; caseCount: number }[]>([])
   const [selectedCm, setSelectedCm] = useState<string>('')
   const [selectedCmName, setSelectedCmName] = useState<string>('')
+  const [page, setPage] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
+  const [pageSize, setPageSize] = useState(50)
 
   // Load CM list on mount
   useEffect(() => {
     getCaseManagers().then(setCmList)
   }, [])
 
-  // Load cases when CM selection changes
+  // Load cases when CM selection or page changes
   useEffect(() => {
     setLoading(true)
-    getAllCasesLive(selectedCm || undefined).then(cases => {
-      setAllCases(cases)
+    getAllCasesLive(selectedCm || undefined, page).then(result => {
+      setAllCases(result.cases)
+      setTotalCount(result.totalCount)
+      setPageSize(result.pageSize)
       setLoading(false)
     })
-  }, [selectedCm])
+  }, [selectedCm, page])
+
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   const filteredCases = useMemo(() => {
     let cases = allCases
@@ -180,12 +187,13 @@ export function Caseload() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Caseload</h1>
           <p className="text-sm text-muted-foreground">
-            {filteredCases.length} case{filteredCases.length !== 1 ? 's' : ''}{filteredCases.length !== allCases.length ? ` (${allCases.length} total)` : ''}{selectedCmName ? ` — ${selectedCmName}` : ''}
+            Showing {filteredCases.length} of {totalCount.toLocaleString()} cases{selectedCmName ? ` — ${selectedCmName}` : ''} (Page {page + 1} of {totalPages})
           </p>
         </div>
         <Select
           value={selectedCm}
           onValueChange={(v) => {
+            setPage(0)
             if (v === '__all__') {
               setSelectedCm('')
               setSelectedCmName('')
@@ -335,10 +343,51 @@ export function Caseload() {
           )
         })}
 
-        {filteredCases.length === 0 && (
+        {filteredCases.length === 0 && !loading && (
           <p className="text-center text-muted-foreground py-8">No cases match your filters.</p>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 0 || loading}
+            onClick={() => setPage(0)}
+          >
+            First
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 0 || loading}
+            onClick={() => setPage(p => p - 1)}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground px-3">
+            Page {page + 1} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages - 1 || loading}
+            onClick={() => setPage(p => p + 1)}
+          >
+            Next
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages - 1 || loading}
+            onClick={() => setPage(totalPages - 1)}
+          >
+            Last
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

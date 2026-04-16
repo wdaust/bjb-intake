@@ -88,8 +88,8 @@ export function ManagerDashboard() {
   const [selectedQueue, setSelectedQueue] = useState<QueueName | null>(null)
 
   useEffect(() => {
-    getAllCasesLive().then(cases => {
-      setAllCases(cases)
+    getAllCasesLive(undefined, 0).then(result => {
+      setAllCases(result.cases)
       setLoading(false)
     })
   }, [])

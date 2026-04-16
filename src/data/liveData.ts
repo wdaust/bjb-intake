@@ -11,7 +11,7 @@ import { getAllCases as getMockCases, getTimeline as getMockTimeline } from './m
 
 const sql = neon(import.meta.env.VITE_DATABASE_URL)
 
-const caseCache: Record<string, { cases: FullCaseView[]; time: number }> = {}
+const caseCache: Record<string, { cases: FullCaseView[]; totalCount: number; time: number }> = {}
 const CACHE_TTL = 60_000 // 1 minute
 
 function daysSinceDate(d?: string | null): number {
@@ -62,11 +62,29 @@ export async function getCaseManagers(): Promise<{ id: string; name: string; rol
   }
 }
 
-// Fetch matters with joined client/attorney data
-async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
+const PAGE_SIZE = 50
+
+// Fetch paginated matters with joined client/attorney data
+async function fetchCasesFromNeon(cmUserId?: string, page = 0): Promise<{ cases: FullCaseView[]; totalCount: number }> {
   try {
-    // Get PI matters with clients that have contact info
-    // Optionally filter by case manager (team member user_id)
+    const offset = page * PAGE_SIZE
+
+    // Get total count
+    const [countRow] = cmUserId
+      ? await sql`
+          SELECT COUNT(DISTINCT m.sf_id)::int as cnt
+          FROM sf_matters m
+          INNER JOIN sf_team_members tm ON tm.matter_id = m.sf_id AND tm.user_id = ${cmUserId}
+          WHERE m.status NOT IN ('Closed', 'Resolved') AND m.pi_status IS NOT NULL
+        `
+      : await sql`
+          SELECT COUNT(*)::int as cnt
+          FROM sf_matters
+          WHERE status NOT IN ('Closed', 'Resolved') AND pi_status IS NOT NULL
+        `
+    const totalCount = (countRow as Record<string, unknown>).cnt as number
+
+    // Get page of matters
     const matters = cmUserId
       ? await sql`
           SELECT
@@ -87,7 +105,7 @@ async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
           WHERE m.status NOT IN ('Closed', 'Resolved')
             AND m.pi_status IS NOT NULL
           ORDER BY m.open_date DESC NULLS LAST
-          LIMIT 2000
+          LIMIT ${PAGE_SIZE} OFFSET ${offset}
         `
       : await sql`
           SELECT
@@ -107,10 +125,10 @@ async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
           WHERE m.status NOT IN ('Closed', 'Resolved')
             AND m.pi_status IS NOT NULL
           ORDER BY m.open_date DESC NULLS LAST
-          LIMIT 2000
+          LIMIT ${PAGE_SIZE} OFFSET ${offset}
         `
 
-    if (matters.length === 0) return getMockCases()
+    if (matters.length === 0 && page === 0) return { cases: getMockCases(), totalCount: getMockCases().length }
 
     const matterIds = matters.map((m: Record<string, unknown>) => m.sf_id as string)
 
@@ -128,7 +146,7 @@ async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
     const teamMap = groupBy(teamMembers, 'matter_id')
     const taskMap = groupBy(tasks, 'matter_id')
 
-    return matters.map((m: Record<string, unknown>) => {
+    const mappedCases = matters.map((m: Record<string, unknown>) => {
       const mid = m.sf_id as string
       const mInjuries = injuryMap[mid] || []
       const mDamages = damageMap[mid] || []
@@ -302,9 +320,12 @@ async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
 
       return fullCase
     })
+
+    return { cases: mappedCases, totalCount }
   } catch (err) {
     console.error('[liveData] Failed to fetch from Neon, falling back to mock:', err)
-    return getMockCases()
+    const mock = getMockCases()
+    return { cases: mock, totalCount: mock.length }
   }
 }
 
@@ -323,20 +344,29 @@ function groupBy(arr: Record<string, unknown>[], key: string): Record<string, Re
 // Public API — same interface as mockData.ts
 // ============================================================
 
-export async function getAllCasesLive(cmUserId?: string): Promise<FullCaseView[]> {
-  const cacheKey = cmUserId || '__all__'
+export async function getAllCasesLive(cmUserId?: string, page = 0): Promise<{ cases: FullCaseView[]; totalCount: number; pageSize: number }> {
+  const cacheKey = `${cmUserId || '__all__'}_p${page}`
   const cached = caseCache[cacheKey]
   if (cached && Date.now() - cached.time < CACHE_TTL) {
-    return cached.cases
+    return { cases: cached.cases, totalCount: cached.totalCount, pageSize: PAGE_SIZE }
   }
-  const cases = await fetchCasesFromNeon(cmUserId)
-  caseCache[cacheKey] = { cases, time: Date.now() }
-  return cases
+  const result = await fetchCasesFromNeon(cmUserId, page)
+  caseCache[cacheKey] = { cases: result.cases, totalCount: result.totalCount, time: Date.now() }
+  return { cases: result.cases, totalCount: result.totalCount, pageSize: PAGE_SIZE }
 }
 
 export async function getCaseByIdLive(caseId: string): Promise<FullCaseView | undefined> {
-  const cases = await getAllCasesLive()
-  return cases.find(c => c.caseData.id === caseId)
+  // Check cache first across all pages
+  for (const entry of Object.values(caseCache)) {
+    const found = entry.cases.find(c => c.caseData.id === caseId)
+    if (found) return found
+  }
+  // If not cached, fetch a single page filtered to this case
+  const result = await fetchCasesFromNeon(undefined, 0)
+  const found = result.cases.find(c => c.caseData.id === caseId)
+  if (found) return found
+  // Fallback to mock
+  return getMockCases().find(c => c.caseData.id === caseId)
 }
 
 export async function getTimelineLive(caseId: string): Promise<TimelineEvent[]> {
