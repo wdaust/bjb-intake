@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { getAllCasesLive, getCaseManagers } from '@/data/liveData'
 import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView, SortCriteria } from '@/types'
@@ -203,8 +203,12 @@ export function Caseload() {
             }
           }}
         >
-          <SelectTrigger className="w-72">
-            <SelectValue placeholder="All Cases (select team member to filter)" />
+          <SelectTrigger className="w-96">
+            <span className="truncate">
+              {selectedCmName
+                ? `${selectedCmName} — ${cmList.find(c => c.id === selectedCm)?.caseCount || 0} cases`
+                : 'All Cases (select team member to filter)'}
+            </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">All Cases</SelectItem>
@@ -226,8 +230,8 @@ export function Caseload() {
           className="w-64"
         />
         <Select value={sortBy} onValueChange={(v) => { if (v) setSortBy(v as SortCriteria) }}>
-          <SelectTrigger className="w-56">
-            <SelectValue placeholder="Sort by..." />
+          <SelectTrigger className="w-72">
+            <span className="truncate">{SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'Sort by...'}</span>
           </SelectTrigger>
           <SelectContent>
             {SORT_OPTIONS.map((opt) => (
