@@ -83,7 +83,7 @@ async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
           WHERE m.status NOT IN ('Closed', 'Resolved')
             AND m.pi_status IS NOT NULL
           ORDER BY m.open_date DESC NULLS LAST
-          LIMIT 200
+          LIMIT 2000
         `
       : await sql`
           SELECT
@@ -103,7 +103,7 @@ async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
           WHERE m.status NOT IN ('Closed', 'Resolved')
             AND m.pi_status IS NOT NULL
           ORDER BY m.open_date DESC NULLS LAST
-          LIMIT 200
+          LIMIT 2000
         `
 
     if (matters.length === 0) return getMockCases()
