@@ -230,7 +230,7 @@ export function ManagerDashboard() {
       {/* CM Performance Metrics */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Case Manager Performance — Sarah Chen</CardTitle>
+          <CardTitle className="text-base">Case Manager Performance</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-4 gap-4 text-sm">

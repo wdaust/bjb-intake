@@ -11,8 +11,7 @@ import { getAllCases as getMockCases, getTimeline as getMockTimeline } from './m
 
 const sql = neon(import.meta.env.VITE_DATABASE_URL)
 
-let cachedCases: FullCaseView[] | null = null
-let cacheTime = 0
+const caseCache: Record<string, { cases: FullCaseView[]; time: number }> = {}
 const CACHE_TTL = 60_000 // 1 minute
 
 function daysSinceDate(d?: string | null): number {
@@ -32,32 +31,84 @@ function mapStage(matterStage?: string | null, piStatus?: string | null): CaseSt
   return 'active_treatment'
 }
 
+// Fetch available case managers / paralegals for the CM selector
+export async function getCaseManagers(): Promise<{ id: string; name: string; role: string }[]> {
+  try {
+    const rows = await sql`
+      SELECT DISTINCT u.sf_id, u.name, tm.role_name
+      FROM sf_team_members tm
+      JOIN sf_users u ON tm.user_id = u.sf_id
+      WHERE tm.role_name IS NOT NULL
+        AND u.name IS NOT NULL
+        AND (
+          tm.role_name ILIKE '%paralegal%'
+          OR tm.role_name ILIKE '%case manager%'
+          OR tm.role_name ILIKE '%medical%'
+          OR tm.role_name ILIKE '%attorney%'
+        )
+      ORDER BY u.name
+    `
+    return rows.map((r: Record<string, unknown>) => ({
+      id: r.sf_id as string,
+      name: r.name as string,
+      role: r.role_name as string,
+    }))
+  } catch {
+    return []
+  }
+}
+
 // Fetch matters with joined client/attorney data
-async function fetchCasesFromNeon(): Promise<FullCaseView[]> {
+async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
   try {
     // Get PI matters with clients that have contact info
-    const matters = await sql`
-      SELECT
-        m.sf_id, m.name as matter_id, m.display_name, m.status, m.case_type,
-        m.practice_area, m.matter_stage, m.pi_status, m.matter_state,
-        m.open_date, m.close_date, m.complaint_filed_date, m.incident_date,
-        m.retention_date, m.statute_of_limitations, m.venue,
-        m.client_id, m.principal_attorney_id,
-        c.first_name as client_first, c.last_name as client_last,
-        c.phone as client_phone, c.email as client_email,
-        c.mailing_state as client_state, c.birthdate as client_dob,
-        c.mailing_street, c.mailing_city,
-        atty.name as attorney_name
-      FROM sf_matters m
-      LEFT JOIN sf_contacts c ON m.client_id = c.sf_id
-      LEFT JOIN sf_users atty ON m.principal_attorney_id = atty.sf_id
-      WHERE m.status NOT IN ('Closed', 'Resolved')
-        AND c.first_name IS NOT NULL
-        AND c.last_name IS NOT NULL
-        AND m.pi_status IS NOT NULL
-      ORDER BY m.open_date DESC NULLS LAST
-      LIMIT 100
-    `
+    // Optionally filter by case manager (team member user_id)
+    const matters = cmUserId
+      ? await sql`
+          SELECT
+            m.sf_id, m.name as matter_id, m.display_name, m.status, m.case_type,
+            m.practice_area, m.matter_stage, m.pi_status, m.matter_state,
+            m.open_date, m.close_date, m.complaint_filed_date, m.incident_date,
+            m.retention_date, m.statute_of_limitations, m.venue,
+            m.client_id, m.principal_attorney_id,
+            c.first_name as client_first, c.last_name as client_last,
+            c.phone as client_phone, c.email as client_email,
+            c.mailing_state as client_state, c.birthdate as client_dob,
+            c.mailing_street, c.mailing_city,
+            atty.name as attorney_name
+          FROM sf_matters m
+          LEFT JOIN sf_contacts c ON m.client_id = c.sf_id
+          LEFT JOIN sf_users atty ON m.principal_attorney_id = atty.sf_id
+          INNER JOIN sf_team_members tm ON tm.matter_id = m.sf_id AND tm.user_id = ${cmUserId}
+          WHERE m.status NOT IN ('Closed', 'Resolved')
+            AND c.first_name IS NOT NULL
+            AND c.last_name IS NOT NULL
+            AND m.pi_status IS NOT NULL
+          ORDER BY m.open_date DESC NULLS LAST
+          LIMIT 200
+        `
+      : await sql`
+          SELECT
+            m.sf_id, m.name as matter_id, m.display_name, m.status, m.case_type,
+            m.practice_area, m.matter_stage, m.pi_status, m.matter_state,
+            m.open_date, m.close_date, m.complaint_filed_date, m.incident_date,
+            m.retention_date, m.statute_of_limitations, m.venue,
+            m.client_id, m.principal_attorney_id,
+            c.first_name as client_first, c.last_name as client_last,
+            c.phone as client_phone, c.email as client_email,
+            c.mailing_state as client_state, c.birthdate as client_dob,
+            c.mailing_street, c.mailing_city,
+            atty.name as attorney_name
+          FROM sf_matters m
+          LEFT JOIN sf_contacts c ON m.client_id = c.sf_id
+          LEFT JOIN sf_users atty ON m.principal_attorney_id = atty.sf_id
+          WHERE m.status NOT IN ('Closed', 'Resolved')
+            AND c.first_name IS NOT NULL
+            AND c.last_name IS NOT NULL
+            AND m.pi_status IS NOT NULL
+          ORDER BY m.open_date DESC NULLS LAST
+          LIMIT 100
+        `
 
     if (matters.length === 0) return getMockCases()
 
@@ -258,13 +309,15 @@ function groupBy(arr: Record<string, unknown>[], key: string): Record<string, Re
 // Public API — same interface as mockData.ts
 // ============================================================
 
-export async function getAllCasesLive(): Promise<FullCaseView[]> {
-  if (cachedCases && Date.now() - cacheTime < CACHE_TTL) {
-    return cachedCases
+export async function getAllCasesLive(cmUserId?: string): Promise<FullCaseView[]> {
+  const cacheKey = cmUserId || '__all__'
+  const cached = caseCache[cacheKey]
+  if (cached && Date.now() - cached.time < CACHE_TTL) {
+    return cached.cases
   }
-  cachedCases = await fetchCasesFromNeon()
-  cacheTime = Date.now()
-  return cachedCases
+  const cases = await fetchCasesFromNeon(cmUserId)
+  caseCache[cacheKey] = { cases, time: Date.now() }
+  return cases
 }
 
 export async function getCaseByIdLive(caseId: string): Promise<FullCaseView | undefined> {

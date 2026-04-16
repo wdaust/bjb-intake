@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { getAllCasesLive } from '@/data/liveData'
+import { getAllCasesLive, getCaseManagers } from '@/data/liveData'
 import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView, SortCriteria } from '@/types'
 
@@ -122,13 +122,23 @@ export function Caseload() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortCriteria>('treatment_gap')
   const [filterPreset, setFilterPreset] = useState('all')
+  const [cmList, setCmList] = useState<{ id: string; name: string; role: string }[]>([])
+  const [selectedCm, setSelectedCm] = useState<string>('')
+  const [selectedCmName, setSelectedCmName] = useState<string>('')
 
+  // Load CM list on mount
   useEffect(() => {
-    getAllCasesLive().then(cases => {
+    getCaseManagers().then(setCmList)
+  }, [])
+
+  // Load cases when CM selection changes
+  useEffect(() => {
+    setLoading(true)
+    getAllCasesLive(selectedCm || undefined).then(cases => {
       setAllCases(cases)
       setLoading(false)
     })
-  }, [])
+  }, [selectedCm])
 
   const filteredCases = useMemo(() => {
     let cases = allCases
@@ -166,11 +176,37 @@ export function Caseload() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Caseload</h1>
-        <p className="text-sm text-muted-foreground">
-          {allCases.length} assigned clients — Sarah Chen
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Caseload</h1>
+          <p className="text-sm text-muted-foreground">
+            {allCases.length} cases{selectedCmName ? ` — ${selectedCmName}` : ''}
+          </p>
+        </div>
+        <Select
+          value={selectedCm}
+          onValueChange={(v) => {
+            if (v === '__all__') {
+              setSelectedCm('')
+              setSelectedCmName('')
+            } else if (v) {
+              setSelectedCm(v)
+              setSelectedCmName(cmList.find(c => c.id === v)?.name || '')
+            }
+          }}
+        >
+          <SelectTrigger className="w-72">
+            <SelectValue placeholder="All Cases (select team member to filter)" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Cases</SelectItem>
+            {cmList.map((cm) => (
+              <SelectItem key={cm.id} value={cm.id}>
+                {cm.name} ({cm.role})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Controls */}
