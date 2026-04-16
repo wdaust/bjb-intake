@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { getCaseById } from '@/data/mockData'
+import { getCaseByIdLive } from '@/data/liveData'
 import { getNode, getStartNode } from '@/data/callFlowNodes'
-import type { CallNode, CapturedCallData, CaseDirection, CallStage, TaskItem } from '@/types'
+import type { CallNode, CapturedCallData, CaseDirection, CallStage, TaskItem, FullCaseView } from '@/types'
 
 const STAGE_LABELS: Record<CallStage, string> = {
   opening: 'Opening',
@@ -54,7 +54,11 @@ const DIRECTION_COLORS: Record<string, string> = {
 export function GuidedCall() {
   const { caseId } = useParams<{ caseId: string }>()
   const navigate = useNavigate()
-  const cv = getCaseById(caseId || '')
+  const [cv, setCv] = useState<FullCaseView | null>(null)
+
+  useEffect(() => {
+    getCaseByIdLive(caseId || '').then(data => setCv(data || null))
+  }, [caseId])
 
   const [currentNode, setCurrentNode] = useState<CallNode>(getStartNode())
   const [history, setHistory] = useState<{ nodeId: string; answerId: string }[]>([])

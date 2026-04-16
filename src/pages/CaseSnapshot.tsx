@@ -1,8 +1,10 @@
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { getCaseById, daysSince, daysUntil } from '@/data/mockData'
+import { getCaseByIdLive } from '@/data/liveData'
+import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView } from '@/types'
 
 const STAGE_LABELS: Record<string, string> = {
@@ -163,11 +165,18 @@ function generateToneGuidance(cv: FullCaseView): string {
 export function CaseSnapshot() {
   const { caseId } = useParams<{ caseId: string }>()
   const navigate = useNavigate()
-  const cv = getCaseById(caseId || '')
+  const [cv, setCv] = useState<FullCaseView | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  if (!cv) {
-    return <p className="text-muted-foreground">Case not found.</p>
-  }
+  useEffect(() => {
+    getCaseByIdLive(caseId || '').then(data => {
+      setCv(data || null)
+      setLoading(false)
+    })
+  }, [caseId])
+
+  if (loading) return <p className="text-muted-foreground">Loading case...</p>
+  if (!cv) return <p className="text-muted-foreground">Case not found.</p>
 
   const whyCalling = generateWhyYouAreCalling(cv)
   const objectives = generateObjectives(cv)

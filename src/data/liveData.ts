@@ -1,0 +1,323 @@
+/**
+ * Live data layer — reads from Neon (synced from Litify).
+ * Returns FullCaseView objects compatible with the rest of the app.
+ * Falls back to mockData if queries fail.
+ */
+
+import { neon } from '@neondatabase/serverless'
+import type { FullCaseView, Client, Case, TreatmentRecord, Provider, Referral, OperationalData, CaseStage, ProviderStatus, TimelineEvent } from '@/types'
+import { calculateScores } from './scoringEngine'
+import { getAllCases as getMockCases, getTimeline as getMockTimeline } from './mockData'
+
+const sql = neon(import.meta.env.VITE_DATABASE_URL)
+
+let cachedCases: FullCaseView[] | null = null
+let cacheTime = 0
+const CACHE_TTL = 60_000 // 1 minute
+
+function daysSinceDate(d?: string | null): number {
+  if (!d) return 999
+  return Math.floor((Date.now() - new Date(d).getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function mapStage(matterStage?: string | null, piStatus?: string | null): CaseStage {
+  if (!matterStage) return 'active_treatment'
+  const s = matterStage.toLowerCase()
+  if (s.includes('accounts opening') || s.includes('pending review')) return 'early_case'
+  if (s.includes('file review') || s.includes('case checkpoint')) return 'active_treatment'
+  if (s.includes('package out')) return 'mid_treatment'
+  if (s.includes('discovery') || s.includes('deps')) return 'late_treatment'
+  if (s.includes('settlement') || s.includes('settled')) return 'demand_prep'
+  if (piStatus === 'Litigation') return 'litigation'
+  return 'active_treatment'
+}
+
+// Fetch matters with joined client/attorney data
+async function fetchCasesFromNeon(): Promise<FullCaseView[]> {
+  try {
+    // Get PI matters with clients that have contact info
+    const matters = await sql`
+      SELECT
+        m.sf_id, m.name as matter_id, m.display_name, m.status, m.case_type,
+        m.practice_area, m.matter_stage, m.pi_status, m.matter_state,
+        m.open_date, m.close_date, m.complaint_filed_date, m.incident_date,
+        m.retention_date, m.statute_of_limitations, m.venue,
+        m.client_id, m.principal_attorney_id,
+        c.first_name as client_first, c.last_name as client_last,
+        c.phone as client_phone, c.email as client_email,
+        c.mailing_state as client_state, c.birthdate as client_dob,
+        c.mailing_street, c.mailing_city,
+        atty.name as attorney_name
+      FROM sf_matters m
+      LEFT JOIN sf_contacts c ON m.client_id = c.sf_id
+      LEFT JOIN sf_users atty ON m.principal_attorney_id = atty.sf_id
+      WHERE m.status NOT IN ('Closed', 'Resolved')
+        AND c.first_name IS NOT NULL
+        AND c.last_name IS NOT NULL
+        AND m.pi_status IS NOT NULL
+      ORDER BY m.open_date DESC NULLS LAST
+      LIMIT 100
+    `
+
+    if (matters.length === 0) return getMockCases()
+
+    const matterIds = matters.map((m: Record<string, unknown>) => m.sf_id as string)
+
+    // Batch fetch related data
+    const [injuries, damages, teamMembers, tasks] = await Promise.all([
+      sql`SELECT * FROM sf_injuries WHERE matter_id = ANY(${matterIds})`,
+      sql`SELECT * FROM sf_damages WHERE matter_id = ANY(${matterIds})`,
+      sql`SELECT tm.*, u.name as user_name FROM sf_team_members tm LEFT JOIN sf_users u ON tm.user_id = u.sf_id WHERE tm.matter_id = ANY(${matterIds})`,
+      sql`SELECT * FROM sf_tasks WHERE matter_id = ANY(${matterIds}) ORDER BY activity_date DESC`,
+    ])
+
+    // Index related data by matter_id
+    const injuryMap = groupBy(injuries, 'matter_id')
+    const damageMap = groupBy(damages, 'matter_id')
+    const teamMap = groupBy(teamMembers, 'matter_id')
+    const taskMap = groupBy(tasks, 'matter_id')
+
+    return matters.map((m: Record<string, unknown>) => {
+      const mid = m.sf_id as string
+      const mInjuries = injuryMap[mid] || []
+      const mDamages = damageMap[mid] || []
+      const mTeam = teamMap[mid] || []
+      const mTasks = taskMap[mid] || []
+
+      // Find team roles
+      const cm = mTeam.find((t: Record<string, unknown>) =>
+        ((t.role_name as string) || '').toLowerCase().includes('paralegal') ||
+        ((t.role_name as string) || '').toLowerCase().includes('case manager')
+      )
+      const mml = mTeam.find((t: Record<string, unknown>) =>
+        ((t.role_name as string) || '').toLowerCase().includes('medical')
+      )
+
+      // Compute treatment dates from damages
+      const serviceDates = mDamages
+        .map((d: Record<string, unknown>) => d.service_end_date as string | null)
+        .filter(Boolean)
+        .sort()
+      const lastTreatmentDate = serviceDates.length > 0 ? serviceDates[serviceDates.length - 1] : null
+      const firstTreatmentDate = mDamages
+        .map((d: Record<string, unknown>) => d.service_start_date as string | null)
+        .filter(Boolean)
+        .sort()[0] || null
+
+      // Last contact from tasks
+      const closedTasks = mTasks.filter((t: Record<string, unknown>) => t.is_closed)
+      const lastContactDate = closedTasks.length > 0
+        ? (closedTasks[0].completed_date || closedTasks[0].activity_date) as string | null
+        : null
+
+      const openTaskCount = mTasks.filter((t: Record<string, unknown>) => !t.is_closed).length
+
+      // Providers from damages
+      const providerNames: string[] = [...new Set(
+        mDamages
+          .map((d: Record<string, unknown>) => d.provider_name as string | null)
+          .filter((n): n is string => !!n)
+      )]
+
+      const treatmentGapDays = lastTreatmentDate ? daysSinceDate(lastTreatmentDate) : 999
+      const noContactDays = lastContactDate ? daysSinceDate(lastContactDate) : 999
+
+      const clientName = `${m.client_first || ''} ${m.client_last || ''}`.trim()
+
+      const client: Client = {
+        id: m.client_id as string || mid,
+        fullName: clientName || (m.display_name as string) || 'Unknown',
+        preferredName: m.client_first as string || undefined,
+        phone: (m.client_phone as string) || '—',
+        email: (m.client_email as string) || undefined,
+        preferredContactMethod: 'phone',
+        primaryLanguage: 'English',
+        interpreterNeeded: false,
+        state: (m.client_state as string) || (m.matter_state as string) || 'NJ',
+        dateOfBirth: (m.client_dob as string) || '1980-01-01',
+        address: m.mailing_street ? `${m.mailing_street}, ${m.mailing_city || ''}` : undefined,
+        workStatus: undefined,
+      }
+
+      const caseData: Case = {
+        id: mid,
+        clientId: m.client_id as string || mid,
+        matterId: (m.matter_id as string) || mid,
+        caseType: 'Personal Injury',
+        accidentType: 'Motor Vehicle Accident',
+        dateOfIncident: (m.incident_date as string) || (m.open_date as string) || '2025-01-01',
+        liabilitySummary: undefined,
+        venue: (m.venue as string) || undefined,
+        attorneyAssigned: (m.attorney_name as string) || 'Unassigned',
+        caseManagerAssigned: (cm?.user_name as string) || 'Unassigned',
+        medicalManagementLead: (mml?.user_name as string) || undefined,
+        retentionDate: (m.retention_date as string) || (m.open_date as string) || '2025-01-01',
+        currentStage: mapStage(m.matter_stage as string, m.pi_status as string),
+        currentSubstage: (m.matter_stage as string) || undefined,
+        statuteOfLimitationsDate: (m.statute_of_limitations as string) || '2028-01-01',
+      }
+
+      const bodyParts = mInjuries.map((i: Record<string, unknown>) => (i.body_part as string) || 'Unknown')
+      const knownInjuries = mInjuries
+        .map((i: Record<string, unknown>) => (i.diagnosis as string) || (i.body_part as string) || 'Injury')
+        .filter(Boolean)
+
+      const treatment: TreatmentRecord = {
+        id: `treat-${mid}`,
+        caseId: mid,
+        bodyPartsComplained: bodyParts,
+        knownInjuries,
+        symptomSummary: mInjuries.length > 0
+          ? `${mInjuries.length} injury/injuries reported. ${bodyParts.join(', ')}.`
+          : 'No injuries on file.',
+        treatmentStartDate: firstTreatmentDate || undefined,
+        lastTreatmentDate: lastTreatmentDate || undefined,
+        nextAppointmentDate: undefined, // Not in Litify damages
+        totalVisits: mDamages.length,
+        missedAppointments: 0,
+        diagnosticsOrdered: [],
+        diagnosticsCompleted: [],
+        surgeryRecommendationStatus: 'none',
+        injectionRecommendationStatus: 'none',
+        erVisitHistory: false,
+        pcpInvolvement: false,
+        ptChiroStatus: providerNames.some(n => /chiro|pt|physical/i.test(n)) ? 'active' as ProviderStatus : 'not_referred' as ProviderStatus,
+        orthoStatus: providerNames.some(n => /ortho/i.test(n)) ? 'active' as ProviderStatus : 'not_referred' as ProviderStatus,
+        painManagementStatus: providerNames.some(n => /pain/i.test(n)) ? 'active' as ProviderStatus : 'not_referred' as ProviderStatus,
+        neurologyStatus: providerNames.some(n => /neuro/i.test(n)) ? 'active' as ProviderStatus : 'not_referred' as ProviderStatus,
+        specialistStatus: 'not_referred',
+        dischargeStatus: 'none',
+        plateauIndicator: mInjuries.some((i: Record<string, unknown>) => (i.current_status as string) === 'Maximum Medical Improvement'),
+      }
+
+      const providers: Provider[] = providerNames.map((name, i) => ({
+        id: `prov-${mid}-${i}`,
+        caseId: mid,
+        name: name!,
+        type: 'other' as const,
+        status: 'active' as ProviderStatus,
+        lastVisitDate: lastTreatmentDate || undefined,
+      }))
+
+      const referrals: Referral[] = []
+
+      const operational: OperationalData = {
+        caseId: mid,
+        lastContactDate: lastContactDate || undefined,
+        lastSuccessfulContactDate: lastContactDate || undefined,
+        lastCallOutcome: closedTasks.length > 0 ? (closedTasks[0].subject as string) || undefined : undefined,
+        nextFollowUpDate: undefined,
+        outstandingTasks: openTaskCount,
+        staleTasks: 0,
+        noContactDays: Math.min(noContactDays, 999),
+        treatmentGapDays: Math.min(treatmentGapDays, 999),
+        unresolvedReferralDays: 0,
+        currentRiskFlags: [],
+        priorEscalations: [],
+      }
+
+      // Build risk flags
+      if (treatmentGapDays > 14) operational.currentRiskFlags.push('treatment_gap')
+      if (noContactDays > 21) operational.currentRiskFlags.push('no_contact')
+      if (!treatment.nextAppointmentDate) operational.currentRiskFlags.push('no_next_appointment')
+      if (mDamages.length < 3 && daysSinceDate(caseData.dateOfIncident) > 90) operational.currentRiskFlags.push('weak_treatment')
+
+      const fullCase: FullCaseView = {
+        client,
+        caseData,
+        treatment,
+        providers,
+        referrals,
+        operational,
+        scores: { treatmentContinuityScore: 0, symptomPersistenceScore: 0, barrierSeverityScore: 0, providerProgressionScore: 0, clientEngagementScore: 0, complianceScore: 0, demandTrajectoryScore: 0, urgencyScore: 0, caseWeaknessScore: 0, directionConfidenceScore: 0 },
+      }
+
+      // Calculate scores from real data
+      fullCase.scores = calculateScores(fullCase)
+
+      return fullCase
+    })
+  } catch (err) {
+    console.error('[liveData] Failed to fetch from Neon, falling back to mock:', err)
+    return getMockCases()
+  }
+}
+
+function groupBy(arr: Record<string, unknown>[], key: string): Record<string, Record<string, unknown>[]> {
+  const map: Record<string, Record<string, unknown>[]> = {}
+  for (const item of arr) {
+    const k = item[key] as string
+    if (!k) continue
+    if (!map[k]) map[k] = []
+    map[k].push(item)
+  }
+  return map
+}
+
+// ============================================================
+// Public API — same interface as mockData.ts
+// ============================================================
+
+export async function getAllCasesLive(): Promise<FullCaseView[]> {
+  if (cachedCases && Date.now() - cacheTime < CACHE_TTL) {
+    return cachedCases
+  }
+  cachedCases = await fetchCasesFromNeon()
+  cacheTime = Date.now()
+  return cachedCases
+}
+
+export async function getCaseByIdLive(caseId: string): Promise<FullCaseView | undefined> {
+  const cases = await getAllCasesLive()
+  return cases.find(c => c.caseData.id === caseId)
+}
+
+export async function getTimelineLive(caseId: string): Promise<TimelineEvent[]> {
+  try {
+    // Build timeline from tasks and damages
+    const [tasks, damages, events] = await Promise.all([
+      sql`SELECT * FROM sf_tasks WHERE matter_id = ${caseId} ORDER BY activity_date DESC LIMIT 50`,
+      sql`SELECT * FROM sf_damages WHERE matter_id = ${caseId} ORDER BY service_start_date DESC LIMIT 50`,
+      sql`SELECT * FROM sf_events WHERE matter_id = ${caseId} ORDER BY start_date DESC LIMIT 50`,
+    ])
+
+    const timeline: TimelineEvent[] = []
+
+    for (const t of tasks) {
+      timeline.push({
+        date: (t.activity_date as string) || (t.completed_date as string) || '',
+        type: t.is_closed ? 'contact' : 'milestone',
+        title: (t.subject as string) || 'Task',
+        description: (t.description as string)?.slice(0, 200) || undefined,
+      })
+    }
+
+    for (const d of damages) {
+      if (d.service_start_date) {
+        timeline.push({
+          date: d.service_start_date as string,
+          type: 'appointment',
+          title: `${(d.type as string) || 'Treatment'} — ${(d.provider_name as string) || 'Provider'}`,
+          providerName: (d.provider_name as string) || undefined,
+        })
+      }
+    }
+
+    for (const e of events) {
+      timeline.push({
+        date: (e.start_date as string) || '',
+        type: 'appointment',
+        title: (e.subject as string) || 'Event',
+        description: (e.description as string)?.slice(0, 200) || undefined,
+      })
+    }
+
+    // Sort newest first
+    timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+    if (timeline.length === 0) return getMockTimeline(caseId)
+    return timeline
+  } catch {
+    return getMockTimeline(caseId)
+  }
+}

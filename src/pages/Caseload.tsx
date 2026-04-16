@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { getAllCases, daysSince, daysUntil } from '@/data/mockData'
+import { getAllCasesLive } from '@/data/liveData'
+import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView, SortCriteria } from '@/types'
 
 const STAGE_LABELS: Record<string, string> = {
@@ -116,10 +117,18 @@ function sortCases(cases: FullCaseView[], criteria: SortCriteria): FullCaseView[
 
 export function Caseload() {
   const navigate = useNavigate()
-  const allCases = getAllCases()
+  const [allCases, setAllCases] = useState<FullCaseView[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortCriteria>('treatment_gap')
   const [filterPreset, setFilterPreset] = useState('all')
+
+  useEffect(() => {
+    getAllCasesLive().then(cases => {
+      setAllCases(cases)
+      setLoading(false)
+    })
+  }, [])
 
   const filteredCases = useMemo(() => {
     let cases = allCases
@@ -197,6 +206,8 @@ export function Caseload() {
           ))}
         </div>
       </div>
+
+      {loading && <p className="text-muted-foreground">Loading caseload from Litify...</p>}
 
       {/* Client List */}
       <div className="space-y-2">

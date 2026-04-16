@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { getAllCases } from '@/data/mockData'
+import { getAllCasesLive } from '@/data/liveData'
 import type { FullCaseView } from '@/types'
 
 type QueueName = 'stagnation' | 'no_appointment' | 'barrier' | 'demand' | 'litigation' | 'cut' | 'transfer' | 'unresolved'
@@ -83,8 +83,16 @@ const SEVERITY_COLORS = {
 
 export function ManagerDashboard() {
   const navigate = useNavigate()
-  const allCases = getAllCases()
+  const [allCases, setAllCases] = useState<FullCaseView[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedQueue, setSelectedQueue] = useState<QueueName | null>(null)
+
+  useEffect(() => {
+    getAllCasesLive().then(cases => {
+      setAllCases(cases)
+      setLoading(false)
+    })
+  }, [])
 
   // Team Metrics
   const totalCases = allCases.length
@@ -101,12 +109,14 @@ export function ManagerDashboard() {
 
   const selectedQueueData = selectedQueue ? queueCounts.find((q) => q.id === selectedQueue) : null
 
+  if (loading) return <p className="text-muted-foreground">Loading dashboard...</p>
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Manager Dashboard</h1>
         <p className="text-sm text-muted-foreground">
-          Team overview — Sarah Chen's caseload ({totalCases} cases)
+          Team overview — Caseload ({totalCases} cases)
         </p>
       </div>
 

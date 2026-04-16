@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { getCaseById, getTimeline } from '@/data/mockData'
+import { getCaseByIdLive, getTimelineLive } from '@/data/liveData'
+import type { FullCaseView, TimelineEvent } from '@/types'
 
 const TYPE_ICONS: Record<string, string> = {
   incident: '!',
@@ -39,12 +41,23 @@ const FLAG_COLORS: Record<string, string> = {
 export function Timeline() {
   const { caseId } = useParams<{ caseId: string }>()
   const navigate = useNavigate()
-  const cv = getCaseById(caseId || '')
-  const events = getTimeline(caseId || '')
+  const [cv, setCv] = useState<FullCaseView | null>(null)
+  const [events, setEvents] = useState<TimelineEvent[]>([])
+  const [loading, setLoading] = useState(true)
 
-  if (!cv) {
-    return <p className="text-muted-foreground">Case not found.</p>
-  }
+  useEffect(() => {
+    Promise.all([
+      getCaseByIdLive(caseId || ''),
+      getTimelineLive(caseId || ''),
+    ]).then(([caseData, timeline]) => {
+      setCv(caseData || null)
+      setEvents(timeline)
+      setLoading(false)
+    })
+  }, [caseId])
+
+  if (loading) return <p className="text-muted-foreground">Loading timeline...</p>
+  if (!cv) return <p className="text-muted-foreground">Case not found.</p>
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
