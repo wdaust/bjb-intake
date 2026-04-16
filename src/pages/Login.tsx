@@ -31,10 +31,15 @@ export function Login() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">Case Advancement OS</CardTitle>
-          <p className="text-sm text-muted-foreground">Sign in to continue</p>
+      <Card className="w-full max-w-sm border-border/50">
+        <CardHeader className="text-center space-y-3">
+          <div className="mx-auto h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
+            <span className="text-sm font-bold text-primary-foreground">CA</span>
+          </div>
+          <div>
+            <CardTitle className="text-lg">Case Advancement OS</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">Sign in to continue</p>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

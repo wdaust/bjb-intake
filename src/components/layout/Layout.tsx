@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext'
 
 const navItems = [
   { label: 'Caseload', path: '/' },
-  { label: 'Manager Dashboard', path: '/manager' },
+  { label: 'Dashboard', path: '/manager' },
   { label: 'Test Mode', path: '/test' },
   { label: 'Flow Builder', path: '/builder' },
 ]
@@ -17,21 +17,24 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-background">
       {!isCallScreen && (
-        <header className="border-b bg-card sticky top-0 z-50">
-          <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-            <Link to="/" className="text-lg font-semibold tracking-tight">
-              Case Advancement OS
+        <header className="border-b border-border/50 bg-card/80 backdrop-blur-sm sticky top-0 z-50">
+          <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4">
+            <Link to="/" className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
+                <span className="text-xs font-bold text-primary-foreground">CA</span>
+              </div>
+              <span className="text-sm font-semibold tracking-tight">Case Advancement OS</span>
             </Link>
-            <div className="flex items-center gap-4">
-              <nav className="flex gap-1">
+            <div className="flex items-center gap-1">
+              <nav className="flex gap-0.5">
                 {navItems.map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
                     className={cn(
-                      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                      'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                       location.pathname === item.path
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-primary/15 text-primary'
                         : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     )}
                   >
@@ -40,13 +43,13 @@ export function Layout() {
                 ))}
               </nav>
               {user && (
-                <div className="flex items-center gap-2 text-sm border-l pl-4">
+                <div className="flex items-center gap-2 text-xs border-l border-border/50 ml-2 pl-3">
                   <span className="text-muted-foreground">{user.displayName || user.email}</span>
                   <button
                     onClick={() => logout()}
-                    className="text-xs text-muted-foreground hover:text-foreground underline"
+                    className="text-[10px] text-muted-foreground/70 hover:text-foreground transition-colors"
                   >
-                    Logout
+                    Sign out
                   </button>
                 </div>
               )}

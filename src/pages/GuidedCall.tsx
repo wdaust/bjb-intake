@@ -39,16 +39,16 @@ const DIRECTION_LABELS: Record<CaseDirection, string> = {
 }
 
 const DIRECTION_COLORS: Record<string, string> = {
-  continue_treatment_optimization: 'bg-green-100 text-green-800 border-green-300',
-  closer_monitoring: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  urgent_re_engagement: 'bg-orange-100 text-orange-800 border-orange-300',
-  next_level_care: 'bg-blue-100 text-blue-800 border-blue-300',
-  demand_readiness_review: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  litigation_review: 'bg-purple-100 text-purple-800 border-purple-300',
-  cut_review: 'bg-red-100 text-red-800 border-red-300',
-  transfer_review: 'bg-amber-100 text-amber-800 border-amber-300',
-  escalate_for_review: 'bg-pink-100 text-pink-800 border-pink-300',
-  unresolved: 'bg-gray-100 text-gray-800 border-gray-300',
+  continue_treatment_optimization: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  closer_monitoring: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+  urgent_re_engagement: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+  next_level_care: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  demand_readiness_review: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
+  litigation_review: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+  cut_review: 'bg-red-500/15 text-red-400 border-red-500/30',
+  transfer_review: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  escalate_for_review: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
+  unresolved: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
 }
 
 export function GuidedCall() {
@@ -164,10 +164,10 @@ export function GuidedCall() {
   if (callComplete) {
     return (
       <div className="max-w-3xl mx-auto space-y-4 py-8">
-        <Card className="border-green-300 bg-green-50">
+        <Card className="border-emerald-500/30 bg-emerald-500/10">
           <CardContent className="p-8 text-center">
-            <h1 className="text-2xl font-bold text-green-800 mb-2">Call Complete</h1>
-            <p className="text-green-700 mb-6">Session data has been captured. Review the post-call summary.</p>
+            <h1 className="text-2xl font-bold text-emerald-400 mb-2">Call Complete</h1>
+            <p className="text-emerald-300/80 mb-6">Session data has been captured. Review the post-call summary.</p>
             <div className="flex gap-3 justify-center">
               <Button onClick={() => navigate(`/summary/${caseId}`, { state: { capturedData, tasks, direction: currentDirection } })}>
                 View Post-Call Summary
@@ -271,10 +271,10 @@ export function GuidedCall() {
         </Card>
 
         {/* Zone 4: Empathy/Tone Coaching */}
-        <Card className="bg-amber-50 border-amber-200">
+        <Card className="bg-amber-500/10 border-amber-500/20">
           <CardContent className="p-4">
-            <p className="text-xs font-medium text-amber-900 uppercase tracking-wide mb-1">Empathy & Tone Coaching</p>
-            <p className="text-sm text-amber-800">{currentNode.empathyGuidance}</p>
+            <p className="text-xs font-medium text-amber-400 uppercase tracking-wide mb-1">Empathy & Tone Coaching</p>
+            <p className="text-sm text-amber-300/80">{currentNode.empathyGuidance}</p>
           </CardContent>
         </Card>
 
@@ -333,12 +333,12 @@ export function GuidedCall() {
         </Card>
 
         {/* Zone 7: Best Next Move */}
-        <Card className="border-blue-200 bg-blue-50">
+        <Card className="border-blue-500/20 bg-blue-500/10">
           <CardHeader className="pb-1">
-            <CardTitle className="text-sm text-blue-900">Best Next Move</CardTitle>
+            <CardTitle className="text-sm text-blue-400">Best Next Move</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-blue-800">{bestNextMove}</p>
+            <p className="text-sm text-blue-300/80">{bestNextMove}</p>
           </CardContent>
         </Card>
 
@@ -356,7 +356,7 @@ export function GuidedCall() {
                   <div
                     key={key}
                     className={`rounded px-2 py-1 text-xs flex justify-between items-center border ${
-                      isTop ? DIRECTION_COLORS[key] : 'bg-white border-transparent'
+                      isTop ? DIRECTION_COLORS[key] : 'bg-transparent border-transparent'
                     }`}
                   >
                     <span className={isTop ? 'font-semibold' : 'text-muted-foreground'}>{label}</span>

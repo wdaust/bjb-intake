@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
-import { getAllCasesLive, getCaseManagers } from '@/data/liveData'
+import { getAllCasesLive, getCaseManagers, searchCases } from '@/data/liveData'
 import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView, SortCriteria } from '@/types'
 
@@ -69,10 +69,10 @@ function getReasonForCall(cv: FullCaseView): string {
 
 function getPriorityLevel(cv: FullCaseView): { label: string; color: string } {
   const score = cv.scores.urgencyScore
-  if (score >= 80) return { label: 'Critical', color: 'bg-red-500 text-white' }
-  if (score >= 60) return { label: 'High', color: 'bg-orange-500 text-white' }
-  if (score >= 40) return { label: 'Medium', color: 'bg-yellow-500 text-black' }
-  return { label: 'Low', color: 'bg-green-500 text-white' }
+  if (score >= 80) return { label: 'Critical', color: 'bg-red-500/20 text-red-400 border border-red-500/30' }
+  if (score >= 60) return { label: 'High', color: 'bg-orange-500/20 text-orange-400 border border-orange-500/30' }
+  if (score >= 40) return { label: 'Medium', color: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' }
+  return { label: 'Low', color: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' }
 }
 
 function getRiskFlags(cv: FullCaseView): { label: string; severity: string }[] {
@@ -136,6 +136,7 @@ export function Caseload() {
 
   // Load cases when CM selection or page changes
   useEffect(() => {
+    if (search.length >= 2) return // search handles its own loading
     setLoading(true)
     getAllCasesLive(selectedCm || undefined, page).then(result => {
       setAllCases(result.cases)
@@ -143,24 +144,28 @@ export function Caseload() {
       setPageSize(result.pageSize)
       setLoading(false)
     })
-  }, [selectedCm, page])
+  }, [selectedCm, page, search])
+
+  // Server-side search with debounce
+  useEffect(() => {
+    if (search.length < 2) return
+    setLoading(true)
+    const timer = setTimeout(() => {
+      searchCases(search).then(results => {
+        setAllCases(results)
+        setTotalCount(results.length)
+        setLoading(false)
+      })
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const totalPages = Math.ceil(totalCount / pageSize)
 
   const filteredCases = useMemo(() => {
     let cases = allCases
 
-    // Search
-    if (search) {
-      const q = search.toLowerCase()
-      cases = cases.filter(
-        (c) =>
-          c.client.fullName.toLowerCase().includes(q) ||
-          c.caseData.matterId.toLowerCase().includes(q)
-      )
-    }
-
-    // Filter presets
+    // Filter presets (search is now server-side)
     switch (filterPreset) {
       case 'urgent':
         cases = cases.filter((c) => c.scores.urgencyScore >= 70)
@@ -267,7 +272,7 @@ export function Caseload() {
           return (
             <Card
               key={cv.caseData.id}
-              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30"
+              className="cursor-pointer transition-all hover:border-primary/40 border-border/50"
               onClick={() => navigate(`/case/${cv.caseData.id}`)}
             >
               <CardContent className="p-4">
@@ -304,11 +309,11 @@ export function Caseload() {
                   <div className="col-span-1">
                     <p className="text-xs text-muted-foreground">Next Appt</p>
                     {cv.treatment.nextAppointmentDate ? (
-                      <p className="text-xs font-medium text-green-600">
+                      <p className="text-xs font-medium text-emerald-400">
                         {new Date(cv.treatment.nextAppointmentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </p>
                     ) : (
-                      <p className="text-xs font-medium text-red-500">None</p>
+                      <p className="text-xs font-medium text-red-400">None</p>
                     )}
                   </div>
 

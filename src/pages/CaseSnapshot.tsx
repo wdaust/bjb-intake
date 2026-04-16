@@ -185,10 +185,10 @@ export function CaseSnapshot() {
   const toneGuide = generateToneGuidance(cv)
 
   const severityColors = {
-    low: 'bg-blue-100 text-blue-800',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
+    low: 'bg-blue-500/15 text-blue-400 border border-blue-500/20',
+    medium: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
+    high: 'bg-orange-500/15 text-orange-400 border border-orange-500/20',
+    critical: 'bg-red-500/15 text-red-400 border border-red-500/20',
   }
 
   return (
@@ -256,7 +256,7 @@ export function CaseSnapshot() {
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Next Appointment</p>
-              <p className={`font-medium ${cv.treatment.nextAppointmentDate ? 'text-green-600' : 'text-red-500'}`}>
+              <p className={`font-medium ${cv.treatment.nextAppointmentDate ? 'text-emerald-400' : 'text-red-400'}`}>
                 {cv.treatment.nextAppointmentDate
                   ? new Date(cv.treatment.nextAppointmentDate).toLocaleDateString()
                   : 'Not scheduled'}
@@ -264,7 +264,7 @@ export function CaseSnapshot() {
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Treatment Gap</p>
-              <p className={`font-medium ${cv.operational.treatmentGapDays > 21 ? 'text-red-500' : cv.operational.treatmentGapDays > 14 ? 'text-orange-500' : ''}`}>
+              <p className={`font-medium ${cv.operational.treatmentGapDays > 21 ? 'text-red-400' : cv.operational.treatmentGapDays > 14 ? 'text-orange-400' : ''}`}>
                 {cv.operational.treatmentGapDays} days
               </p>
             </div>
@@ -280,13 +280,13 @@ export function CaseSnapshot() {
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Open Referrals</p>
-              <p className={`font-medium ${cv.referrals.filter((r) => r.status === 'pending').length > 0 ? 'text-orange-500' : ''}`}>
+              <p className={`font-medium ${cv.referrals.filter((r) => r.status === 'pending').length > 0 ? 'text-orange-400' : ''}`}>
                 {cv.referrals.filter((r) => r.status === 'pending' || r.status === 'failed').length}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Missed Appointments</p>
-              <p className={`font-medium ${cv.treatment.missedAppointments >= 3 ? 'text-red-500' : ''}`}>{cv.treatment.missedAppointments}</p>
+              <p className={`font-medium ${cv.treatment.missedAppointments >= 3 ? 'text-red-400' : ''}`}>{cv.treatment.missedAppointments}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Injuries</p>
@@ -371,12 +371,12 @@ export function CaseSnapshot() {
       </Card>
 
       {/* Section G: Tone Guidance */}
-      <Card className="bg-amber-50 border-amber-200">
+      <Card className="bg-amber-500/10 border-amber-500/20">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base text-amber-900">Tone & Empathy Guidance</CardTitle>
+          <CardTitle className="text-base text-amber-400">Tone & Empathy Guidance</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-amber-800 leading-relaxed">{toneGuide}</p>
+          <p className="text-sm text-amber-300/80 leading-relaxed">{toneGuide}</p>
         </CardContent>
       </Card>
 
