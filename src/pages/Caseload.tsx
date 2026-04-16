@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
-import { getAllCasesLive, getCaseManagers, searchCases } from '@/data/liveData'
+import { getAllCasesLive, getCaseManagers, searchCases, getCmStats, type CmStats } from '@/data/liveData'
 import { useQueue, DEFAULT_CM_ID, DEFAULT_CM_NAME } from '@/lib/QueueContext'
 import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView, SortCriteria } from '@/types'
@@ -131,11 +131,17 @@ export function Caseload() {
   const [pageSize, setPageSize] = useState(50)
 
   const { setQueue } = useQueue()
+  const [cmStats, setCmStats] = useState<CmStats>({ totalCases: 0, urgent: 0, gap14: 0, noRecentTreatment: 0 })
 
   // Load CM list on mount
   useEffect(() => {
     getCaseManagers().then(setCmList)
   }, [])
+
+  // Load stats for selected CM (across ALL their cases)
+  useEffect(() => {
+    getCmStats(selectedCm || undefined).then(setCmStats)
+  }, [selectedCm])
 
   // Load cases when CM selection or page changes
   useEffect(() => {
@@ -190,11 +196,6 @@ export function Caseload() {
     return sortCases(cases, sortBy)
   }, [allCases, search, sortBy, filterPreset])
 
-  // Stats
-  const urgentCount = allCases.filter(c => c.scores.urgencyScore >= 70).length
-  const gapCount = allCases.filter(c => c.operational.treatmentGapDays > 14).length
-  const noApptCount = allCases.filter(c => !c.treatment.nextAppointmentDate).length
-
   function getInitials(name: string): string {
     return name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
   }
@@ -211,20 +212,20 @@ export function Caseload() {
         <div className="flex items-center justify-between">
           <div className="flex gap-6">
             <div className="text-center">
-              <p className="text-2xl font-bold stat-number">{filteredCases.length}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Cases</p>
+              <p className="text-2xl font-bold stat-number">{cmStats.totalCases.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Cases</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-red-400 stat-number">{urgentCount}</p>
+              <p className="text-2xl font-bold text-red-400 stat-number">{cmStats.urgent.toLocaleString()}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Urgent</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-orange-400 stat-number">{gapCount}</p>
+              <p className="text-2xl font-bold text-orange-400 stat-number">{cmStats.gap14.toLocaleString()}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Gap 14d+</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-yellow-400 stat-number">{noApptCount}</p>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">No Appt</p>
+              <p className="text-2xl font-bold text-yellow-400 stat-number">{cmStats.noRecentTreatment.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">No Recent Tx</p>
             </div>
           </div>
           <div className="text-right">

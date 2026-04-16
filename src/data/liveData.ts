@@ -389,6 +389,62 @@ export async function getTimelineLive(caseId: string): Promise<TimelineEvent[]> 
 }
 
 // ============================================================
+// CM-specific stats (all cases, not paginated)
+// ============================================================
+
+export interface CmStats {
+  totalCases: number
+  urgent: number
+  gap14: number
+  noRecentTreatment: number
+}
+
+export async function getCmStats(cmUserId?: string): Promise<CmStats> {
+  try {
+    if (cmUserId) {
+      const [row] = await sql`
+        SELECT
+          COUNT(DISTINCT m.sf_id)::int as total,
+          COUNT(DISTINCT CASE WHEN d.last_svc < now() - interval '14 days' THEN m.sf_id END)::int as gap14,
+          COUNT(DISTINCT CASE WHEN d.last_svc < now() - interval '30 days' OR d.last_svc IS NULL THEN m.sf_id END)::int as no_recent,
+          COUNT(DISTINCT CASE WHEN d.last_svc < now() - interval '30 days' AND t.open_tasks > 2 THEN m.sf_id END)::int as urgent
+        FROM sf_matters m
+        INNER JOIN sf_team_members tm ON tm.matter_id = m.sf_id AND tm.user_id = ${cmUserId}
+        LEFT JOIN (SELECT matter_id, MAX(service_end_date) as last_svc FROM sf_damages GROUP BY matter_id) d ON d.matter_id = m.sf_id
+        LEFT JOIN (SELECT matter_id, COUNT(*)::int as open_tasks FROM sf_tasks WHERE is_closed = false GROUP BY matter_id) t ON t.matter_id = m.sf_id
+        WHERE m.status NOT IN ('Closed', 'Resolved') AND m.pi_status IS NOT NULL
+      `
+      return {
+        totalCases: (row as Record<string, unknown>).total as number,
+        urgent: (row as Record<string, unknown>).urgent as number,
+        gap14: (row as Record<string, unknown>).gap14 as number,
+        noRecentTreatment: (row as Record<string, unknown>).no_recent as number,
+      }
+    }
+    const [row] = await sql`
+      SELECT
+        COUNT(*)::int as total,
+        COUNT(CASE WHEN d.last_svc < now() - interval '14 days' THEN 1 END)::int as gap14,
+        COUNT(CASE WHEN d.last_svc < now() - interval '30 days' OR d.last_svc IS NULL THEN 1 END)::int as no_recent,
+        COUNT(CASE WHEN d.last_svc < now() - interval '30 days' AND t.open_tasks > 2 THEN 1 END)::int as urgent
+      FROM sf_matters m
+      LEFT JOIN (SELECT matter_id, MAX(service_end_date) as last_svc FROM sf_damages GROUP BY matter_id) d ON d.matter_id = m.sf_id
+      LEFT JOIN (SELECT matter_id, COUNT(*)::int as open_tasks FROM sf_tasks WHERE is_closed = false GROUP BY matter_id) t ON t.matter_id = m.sf_id
+      WHERE m.status NOT IN ('Closed', 'Resolved') AND m.pi_status IS NOT NULL
+    `
+    return {
+      totalCases: (row as Record<string, unknown>).total as number,
+      urgent: (row as Record<string, unknown>).urgent as number,
+      gap14: (row as Record<string, unknown>).gap14 as number,
+      noRecentTreatment: (row as Record<string, unknown>).no_recent as number,
+    }
+  } catch (err) {
+    console.error('[liveData] getCmStats failed:', err)
+    return { totalCases: 0, urgent: 0, gap14: 0, noRecentTreatment: 0 }
+  }
+}
+
+// ============================================================
 // Search across ALL cases (server-side)
 // ============================================================
 
