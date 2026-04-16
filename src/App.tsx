@@ -1,18 +1,22 @@
 import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/layout/Layout'
-import { Home } from './pages/Home'
-import { Intake } from './pages/Intake'
-import { AdminScripts } from './pages/AdminScripts'
-import { AdminSessions } from './pages/AdminSessions'
+import { Caseload } from './pages/Caseload'
+import { CaseSnapshot } from './pages/CaseSnapshot'
+import { GuidedCall } from './pages/GuidedCall'
+import { Timeline } from './pages/Timeline'
+import { PostCallSummary } from './pages/PostCallSummary'
+import { ManagerDashboard } from './pages/ManagerDashboard'
 
 function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/intake/:sessionId" element={<Intake />} />
-        <Route path="/admin/scripts" element={<AdminScripts />} />
-        <Route path="/admin/sessions" element={<AdminSessions />} />
+        <Route path="/" element={<Caseload />} />
+        <Route path="/case/:caseId" element={<CaseSnapshot />} />
+        <Route path="/call/:caseId" element={<GuidedCall />} />
+        <Route path="/timeline/:caseId" element={<Timeline />} />
+        <Route path="/summary/:caseId" element={<PostCallSummary />} />
+        <Route path="/manager" element={<ManagerDashboard />} />
       </Route>
     </Routes>
   )

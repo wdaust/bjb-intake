@@ -1,0 +1,863 @@
+import type { CallNode } from '@/types'
+
+// ============================================================
+// Decision Tree Nodes — All 9 Call Stages
+// Spec Sections 13-19, 28, 29, 36
+// ============================================================
+
+const nodes: CallNode[] = [
+
+  // ======================== OPENING ========================
+  {
+    nodeId: 'opening_greeting',
+    nodeName: 'Opening Greeting',
+    stage: 'opening',
+    promptText: "Hi [Client First Name], this is [CM Name] from [Firm]. I wanted to check in with you and see how you've been doing, and also make sure everything is moving the way it should with your care. Do you have a few minutes to talk?",
+    empathyGuidance: 'Start with warmth. Do not jump directly into technical questioning. Let the client feel checked on before being managed. Keep your tone conversational and caring.',
+    purposeText: 'Establish rapport and confirm the client is available and willing to talk. The opening sets the emotional tone for the entire call.',
+    answerOptions: [
+      { id: 'client_available', label: 'Client available', description: 'Client is ready to talk' },
+      { id: 'client_available_briefly', label: 'Available briefly', description: 'Client has limited time' },
+      { id: 'client_asks_about', label: 'Asks what this is about', description: 'Client wants to know the purpose' },
+      { id: 'client_busy_reschedule', label: 'Busy — asks to reschedule', description: 'Client cannot talk now' },
+      { id: 'voicemail', label: 'Voicemail', description: 'Call went to voicemail' },
+      { id: 'wrong_number', label: 'Wrong number', description: 'Number is incorrect' },
+      { id: 'language_barrier', label: 'Language barrier', description: 'Cannot communicate effectively' },
+      { id: 'client_upset', label: 'Client upset immediately', description: 'Client is angry or emotional from the start' },
+      { id: 'urgent_medical', label: 'Urgent medical issue', description: 'Client reports emergency or urgent medical concern' },
+    ],
+    followUpProbes: [],
+    fieldUpdates: [],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      client_available: 'treatment_status_main',
+      client_available_briefly: 'treatment_status_main',
+      client_asks_about: 'opening_explain_purpose',
+      client_busy_reschedule: 'non_contact_reschedule',
+      voicemail: 'non_contact_voicemail',
+      wrong_number: 'non_contact_wrong_number',
+      language_barrier: 'non_contact_language',
+      client_upset: 'difficult_angry_opening',
+      urgent_medical: 'urgent_medical_triage',
+    },
+  },
+
+  {
+    nodeId: 'opening_explain_purpose',
+    nodeName: 'Explain Call Purpose',
+    stage: 'opening',
+    promptText: "Of course — I'm just calling to check in on how your treatment is going and see if there's anything we can help with. We want to make sure everything is progressing well for you. Is now an okay time?",
+    empathyGuidance: 'Be transparent and reassuring. The client may be wary or confused. Keep it simple and warm.',
+    purposeText: 'Address the client\'s question about why you are calling and re-establish willingness to continue.',
+    answerOptions: [
+      { id: 'client_available', label: 'Yes, available', description: 'Client agrees to continue' },
+      { id: 'client_busy_reschedule', label: 'Not now — reschedule', description: 'Client wants to talk later' },
+    ],
+    followUpProbes: [],
+    fieldUpdates: [],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      client_available: 'treatment_status_main',
+      client_busy_reschedule: 'non_contact_reschedule',
+    },
+  },
+
+  // ======================== NON-CONTACT OUTCOMES ========================
+  {
+    nodeId: 'non_contact_voicemail',
+    nodeName: 'Voicemail',
+    stage: 'closeout',
+    promptText: "Leave a warm voicemail: \"Hi [Client First Name], this is [CM Name] from [Firm]. I was just calling to check in on how you're doing and see how your treatment is going. Nothing urgent — just want to make sure you're doing okay. Please call me back at your convenience at [phone]. Have a good day.\"",
+    empathyGuidance: 'Keep the voicemail warm, brief, and non-alarming. The client should feel cared about, not anxious.',
+    purposeText: 'Document the voicemail attempt and schedule appropriate follow-up.',
+    answerOptions: [
+      { id: 'voicemail_left', label: 'Voicemail left', description: 'Message recorded' },
+      { id: 'no_voicemail', label: 'No voicemail option', description: 'Mailbox full or unavailable' },
+    ],
+    followUpProbes: [],
+    fieldUpdates: [{ field: 'engagementLevel', value: 'disengaged' }],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [
+      { condition: 'always', task: { type: 'followup', description: 'Follow up — voicemail left, no contact', owner: '', urgency: 'medium', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: { voicemail_left: 'COMPLETE', no_voicemail: 'COMPLETE' },
+  },
+
+  {
+    nodeId: 'non_contact_reschedule',
+    nodeName: 'Reschedule',
+    stage: 'closeout',
+    promptText: "No problem at all, [Client First Name]. When would be a good time for me to call you back?",
+    empathyGuidance: 'Be flexible and understanding. Do not make the client feel guilty for not being available.',
+    purposeText: 'Secure a specific callback time to avoid losing contact momentum.',
+    answerOptions: [
+      { id: 'time_given', label: 'Client gave a time', description: 'Specific callback scheduled' },
+      { id: 'vague_later', label: '"Just call back later"', description: 'No specific time given' },
+    ],
+    followUpProbes: ['What day works best?', 'Morning or afternoon?'],
+    fieldUpdates: [],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [
+      { condition: 'always', task: { type: 'callback', description: 'Callback scheduled with client', owner: '', urgency: 'medium', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: { time_given: 'COMPLETE', vague_later: 'COMPLETE' },
+  },
+
+  {
+    nodeId: 'non_contact_wrong_number',
+    nodeName: 'Wrong Number',
+    stage: 'closeout',
+    promptText: 'Document: Wrong number reached. Verify correct phone number in system.',
+    empathyGuidance: 'N/A — no client interaction.',
+    purposeText: 'Flag incorrect contact information for correction.',
+    answerOptions: [
+      { id: 'logged', label: 'Logged', description: 'Wrong number documented' },
+    ],
+    followUpProbes: [],
+    fieldUpdates: [],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [
+      { condition: 'always', task: { type: 'admin', description: 'Verify and update client phone number', owner: '', urgency: 'high', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: { logged: 'COMPLETE' },
+  },
+
+  {
+    nodeId: 'non_contact_language',
+    nodeName: 'Language Barrier',
+    stage: 'closeout',
+    promptText: 'Document: Language barrier prevented communication. Arrange interpreter for next call.',
+    empathyGuidance: 'Be patient and kind even if communication is difficult. Do not express frustration.',
+    purposeText: 'Ensure next call has proper language support.',
+    answerOptions: [
+      { id: 'logged', label: 'Logged — interpreter needed', description: 'Interpreter will be arranged' },
+    ],
+    followUpProbes: [],
+    fieldUpdates: [],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [
+      { condition: 'always', task: { type: 'support', description: 'Arrange interpreter for next client call', owner: '', urgency: 'high', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: { logged: 'COMPLETE' },
+  },
+
+  // ======================== DIFFICULT CLIENT DYNAMICS ========================
+  {
+    nodeId: 'difficult_angry_opening',
+    nodeName: 'Angry Client — De-escalation',
+    stage: 'opening',
+    promptText: "I hear you, and I'm sorry you're feeling frustrated. I want to understand what's going on so I can help. Can you tell me what's been bothering you?",
+    empathyGuidance: 'LISTEN FIRST. Do not get defensive. Validate frustration before problem-solving. Maintain warmth and calm. Let the client vent briefly. Do not interrupt. Then gently redirect toward understanding the issue.',
+    purposeText: 'De-escalate the client\'s emotional state so the call can proceed productively. An angry client who feels heard will often engage constructively.',
+    answerOptions: [
+      { id: 'calming_down', label: 'Client calming down', description: 'Venting helped — willing to continue' },
+      { id: 'still_angry', label: 'Still very angry', description: 'Client remains escalated' },
+      { id: 'complaint_about_firm', label: 'Complaint about the firm', description: 'Issue is with firm service' },
+      { id: 'complaint_about_provider', label: 'Complaint about provider', description: 'Issue is with medical provider' },
+      { id: 'wants_to_hang_up', label: 'Wants to end call', description: 'Client wants to disconnect' },
+    ],
+    followUpProbes: [
+      'I understand. That sounds really frustrating.',
+      'Let me see what I can do to help with that.',
+      'I appreciate you telling me this — it helps me understand what needs to happen.',
+    ],
+    fieldUpdates: [{ field: 'clientEmotionalState', value: 'angry' }],
+    scoreUpdates: [{ score: 'clientEngagementScore', adjustment: -10 }],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [
+      { condition: 'if_answer', answerIds: ['complaint_about_firm'], recipient: 'Supervisor', reason: 'Client complaint about firm service', urgency: 'high' },
+    ],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      calming_down: 'treatment_status_main',
+      still_angry: 'difficult_angry_continued',
+      complaint_about_firm: 'treatment_status_main',
+      complaint_about_provider: 'treatment_status_main',
+      wants_to_hang_up: 'non_contact_reschedule',
+    },
+  },
+
+  {
+    nodeId: 'difficult_angry_continued',
+    nodeName: 'Continued Anger',
+    stage: 'opening',
+    promptText: "I completely understand your frustration, and I want you to know that I take this seriously. Would it help if I had someone else reach out to you to address this directly? Or would you rather we try to work through it together right now?",
+    empathyGuidance: 'Continue to validate. Offer options — giving the client control often helps de-escalate. Do not push. If they want a supervisor, arrange it.',
+    purposeText: 'Give the client agency in how to proceed. Forcing a structured call on an angry client will fail.',
+    answerOptions: [
+      { id: 'willing_to_continue', label: 'Willing to continue', description: 'Client agrees to proceed' },
+      { id: 'wants_supervisor', label: 'Wants supervisor/manager', description: 'Escalation requested' },
+      { id: 'wants_to_reschedule', label: 'Reschedule', description: 'Not ready to talk now' },
+    ],
+    followUpProbes: [],
+    fieldUpdates: [],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [
+      { condition: 'if_answer', answerIds: ['wants_supervisor'], recipient: 'Supervisor', reason: 'Client requested supervisor callback', urgency: 'high' },
+    ],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      willing_to_continue: 'treatment_status_main',
+      wants_supervisor: 'COMPLETE',
+      wants_to_reschedule: 'non_contact_reschedule',
+    },
+  },
+
+  {
+    nodeId: 'urgent_medical_triage',
+    nodeName: 'Urgent Medical Triage',
+    stage: 'opening',
+    promptText: "I want to make sure you're okay. Can you tell me what happened? If this is a medical emergency, please call 911 right away.",
+    empathyGuidance: 'Be calm and focused. Do not panic. Prioritize the client\'s immediate safety. If truly emergent, direct to 911 first.',
+    purposeText: 'Assess whether the situation requires emergency intervention or can be handled through normal channels.',
+    answerOptions: [
+      { id: 'emergency_911', label: 'Needs 911 / ER now', description: 'True emergency' },
+      { id: 'new_medical_event', label: 'New medical event (not emergency)', description: 'ER visit, new symptoms, surgery rec, etc.' },
+      { id: 'not_actually_urgent', label: 'Not actually urgent', description: 'Client was emotional but no emergency' },
+    ],
+    followUpProbes: ['Are you in a safe place right now?', 'When did this happen?', 'Have you told your doctor about this?'],
+    fieldUpdates: [{ field: 'newMedicalEvents', value: 'Urgent medical issue reported at call opening' }],
+    scoreUpdates: [{ score: 'urgencyScore', adjustment: 25 }],
+    directionUpdates: [{ direction: 'next_level_care', weight: 2 }],
+    taskRules: [
+      { condition: 'if_answer', answerIds: ['emergency_911', 'new_medical_event'], task: { type: 'escalation', description: 'Urgent medical event — escalate to MML and attorney', owner: '', urgency: 'critical', relatedCaseId: '' } },
+    ],
+    escalationRules: [
+      { condition: 'if_answer', answerIds: ['emergency_911'], recipient: 'Medical Management Lead', reason: 'Client medical emergency reported', urgency: 'critical' },
+    ],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      emergency_911: 'COMPLETE',
+      new_medical_event: 'treatment_status_main',
+      not_actually_urgent: 'treatment_status_main',
+    },
+  },
+
+  // ======================== TREATMENT STATUS ========================
+  {
+    nodeId: 'treatment_status_main',
+    nodeName: 'Treatment Status',
+    stage: 'treatment_status',
+    promptText: "I want to make sure I understand where things stand with your care right now. Are you currently treating for your injuries at the moment?",
+    empathyGuidance: 'Ask gently. Do not make it sound like an interrogation. If the client seems confused by the question, rephrase: "Have you been seeing any doctor, chiropractor, or therapist recently for your injuries from the accident?"',
+    purposeText: 'Determine the core treatment status — this is the most critical branching point of the call. Everything downstream depends on this answer.',
+    answerOptions: [
+      { id: 'actively_treating', label: 'Yes — actively treating', description: 'Currently seeing providers regularly' },
+      { id: 'stopped_treating', label: 'No — stopped treating', description: 'Was treating but has stopped' },
+      { id: 'never_started', label: 'Never started', description: 'Has not begun treatment' },
+      { id: 'inconsistent', label: 'Sort of / inconsistent', description: 'On-and-off treatment pattern' },
+      { id: 'unclear', label: 'Not sure / unclear', description: 'Client is vague about treatment status' },
+      { id: 'evasive', label: 'Evasive / avoids answering', description: 'Client deflects the question' },
+    ],
+    followUpProbes: [
+      'When I say treating, I mean have you recently been seeing any doctor, chiropractor, physical therapist, specialist, or other provider for the injuries from this accident?',
+      'When was the last time you went to any appointment for these injuries?',
+    ],
+    fieldUpdates: [{ field: 'treatmentStatus', value: (answer: string) => answer }],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: ['treatmentStatus'],
+    nextNodeMap: {
+      actively_treating: 'symptoms_main',
+      stopped_treating: 'symptoms_main',
+      never_started: 'symptoms_main',
+      inconsistent: 'symptoms_main',
+      unclear: 'treatment_status_clarify',
+      evasive: 'treatment_status_clarify',
+    },
+  },
+
+  {
+    nodeId: 'treatment_status_clarify',
+    nodeName: 'Clarify Treatment Status',
+    stage: 'treatment_status',
+    promptText: "No worries — let me ask it a different way. When was the last time you went to see any doctor, chiropractor, therapist, or specialist for your injuries from the accident?",
+    empathyGuidance: 'Be patient. The client may be confused, embarrassed, or uncertain. Do not express frustration. Use simple, clear language.',
+    purposeText: 'Get clarity on a vague or evasive answer. Do not proceed without at least an approximate understanding of treatment status.',
+    answerOptions: [
+      { id: 'recently', label: 'Recently (within 2 weeks)', description: 'Active treatment likely' },
+      { id: 'while_ago', label: 'A while ago (weeks/months)', description: 'Gap in treatment' },
+      { id: 'never', label: 'Never went', description: 'Never started treatment' },
+      { id: 'still_unclear', label: 'Still unclear', description: 'Client cannot or will not clarify' },
+    ],
+    followUpProbes: ['Do you remember the last provider you saw?', 'Was it before or after the holidays?'],
+    fieldUpdates: [],
+    scoreUpdates: [{ score: 'directionConfidenceScore', adjustment: -10 }],
+    directionUpdates: [{ direction: 'unresolved', weight: 1 }],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      recently: 'symptoms_main',
+      while_ago: 'symptoms_main',
+      never: 'symptoms_main',
+      still_unclear: 'symptoms_main',
+    },
+  },
+
+  // ======================== SYMPTOMS ========================
+  {
+    nodeId: 'symptoms_main',
+    nodeName: 'Symptom Status',
+    stage: 'symptoms',
+    promptText: "How have you been feeling compared to earlier in the case? Better, worse, about the same, or kind of up and down?",
+    empathyGuidance: 'Let the client describe how they feel without rushing. If they mention pain, acknowledge it: "I\'m sorry to hear that." Client may minimize — stay curious and supportive.',
+    purposeText: 'Determine symptom trajectory — this informs treatment progression quality, case direction, and demand readiness assessment.',
+    answerOptions: [
+      { id: 'better', label: 'Better', description: 'Symptoms improving' },
+      { id: 'worse', label: 'Worse', description: 'Symptoms worsening' },
+      { id: 'same', label: 'About the same', description: 'No significant change' },
+      { id: 'fluctuates', label: 'Up and down / fluctuates', description: 'Variable symptom pattern' },
+      { id: 'hard_to_describe', label: 'Hard to describe', description: 'Client unsure how to characterize' },
+      { id: 'resolved', label: 'Not having symptoms anymore', description: 'Symptoms resolved' },
+    ],
+    followUpProbes: [
+      'Can you tell me more about that?',
+      'Which areas are still bothering you the most?',
+      'Has anything changed recently — better or worse?',
+      'On a scale of 1 to 10, where would you put your pain right now?',
+    ],
+    fieldUpdates: [{ field: 'symptomDirection', value: (answer: string) => answer }],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [
+      { condition: 'if_answer', answerIds: ['worse'], recipient: 'Medical Management Lead', reason: 'Client reports worsening symptoms', urgency: 'medium' },
+    ],
+    requiredCompletionFlags: ['symptomDirection'],
+    nextNodeMap: {
+      better: 'appointments_last',
+      worse: 'symptoms_worse_detail',
+      same: 'appointments_last',
+      fluctuates: 'appointments_last',
+      hard_to_describe: 'appointments_last',
+      resolved: 'symptoms_resolved_detail',
+    },
+  },
+
+  {
+    nodeId: 'symptoms_worse_detail',
+    nodeName: 'Worsening Symptoms Detail',
+    stage: 'symptoms',
+    promptText: "I\'m sorry to hear that. Can you tell me what has gotten worse? Is it the same areas, or has something new come up?",
+    empathyGuidance: 'Be genuinely empathetic. Do not rush past pain. Acknowledge difficulty: "That sounds really difficult to deal with." Ask with care, not clinical detachment.',
+    purposeText: 'Understand what specifically worsened. This affects whether current treatment is sufficient, whether escalation is needed, and case direction.',
+    answerOptions: [
+      { id: 'same_areas_worse', label: 'Same areas — worse pain', description: 'Existing injuries not improving' },
+      { id: 'new_symptoms', label: 'New symptoms appeared', description: 'Something new has developed' },
+      { id: 'both', label: 'Both — same and new', description: 'Multiple issues worsening' },
+      { id: 'cant_specify', label: 'Hard to specify', description: 'Client cannot clearly describe changes' },
+    ],
+    followUpProbes: [
+      'Does your current doctor know about this?',
+      'Have you had any new tests or imaging?',
+      'Is the pain affecting your daily life or work?',
+    ],
+    fieldUpdates: [{ field: 'escalationFlag', value: 'true' }],
+    scoreUpdates: [
+      { score: 'symptomPersistenceScore', adjustment: 15 },
+      { score: 'urgencyScore', adjustment: 10 },
+    ],
+    directionUpdates: [
+      { direction: 'next_level_care', weight: 2 },
+      { direction: 'litigation_review', weight: 1 },
+    ],
+    taskRules: [
+      { condition: 'always', task: { type: 'escalation', description: 'Worsening symptoms — escalate to medical management lead', owner: '', urgency: 'high', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      same_areas_worse: 'appointments_last',
+      new_symptoms: 'appointments_last',
+      both: 'appointments_last',
+      cant_specify: 'appointments_last',
+    },
+  },
+
+  {
+    nodeId: 'symptoms_resolved_detail',
+    nodeName: 'Symptoms Resolved — Verify',
+    stage: 'symptoms',
+    promptText: "That\'s great to hear that you\'re feeling better. Just to make sure I understand — are you completely back to normal, or is there still some lingering discomfort?",
+    empathyGuidance: 'Be positive but thorough. Client may be minimizing. Ask carefully to ensure nothing is being overlooked. Do not challenge — explore.',
+    purposeText: 'Verify whether symptoms are truly resolved or if the client is minimizing. This directly affects demand readiness assessment.',
+    answerOptions: [
+      { id: 'fully_resolved', label: 'Fully resolved — back to normal', description: 'No remaining symptoms' },
+      { id: 'mostly_better', label: 'Mostly better — some lingering', description: 'Significant improvement but not 100%' },
+      { id: 'minimizing', label: 'Seems to be minimizing', description: 'Client may be downplaying issues' },
+    ],
+    followUpProbes: [
+      'Are you able to do everything you could before the accident?',
+      'Any activities that still cause discomfort?',
+      'Has your doctor said you are finished with treatment?',
+    ],
+    fieldUpdates: [],
+    scoreUpdates: [{ score: 'demandTrajectoryScore', adjustment: 15 }],
+    directionUpdates: [{ direction: 'demand_readiness_review', weight: 2 }],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      fully_resolved: 'appointments_last',
+      mostly_better: 'appointments_last',
+      minimizing: 'appointments_last',
+    },
+  },
+
+  // ======================== APPOINTMENTS ========================
+  {
+    nodeId: 'appointments_last',
+    nodeName: 'Last Appointment',
+    stage: 'appointments',
+    promptText: "When was the last time you had an appointment for these injuries?",
+    empathyGuidance: 'If the client cannot remember the exact date, help narrow it down: "Was it in the last week or two, or has it been longer?" Do not make them feel bad if it has been a while.',
+    purposeText: 'Capture the last appointment date precisely. This is critical for treatment gap calculation and continuity assessment.',
+    answerOptions: [
+      { id: 'within_week', label: 'Within the last week', description: 'Very recent' },
+      { id: 'within_two_weeks', label: '1-2 weeks ago', description: 'Recent' },
+      { id: 'few_weeks', label: 'A few weeks ago', description: '2-4 weeks' },
+      { id: 'over_month', label: 'Over a month ago', description: 'Significant gap' },
+      { id: 'months_ago', label: 'Several months ago', description: 'Major gap' },
+      { id: 'dont_remember', label: "Don't remember", description: 'Client unsure' },
+    ],
+    followUpProbes: ['Do you remember which provider that was?', 'Was it before or after a specific event?'],
+    fieldUpdates: [],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      within_week: 'appointments_next',
+      within_two_weeks: 'appointments_next',
+      few_weeks: 'appointments_next',
+      over_month: 'appointments_next',
+      months_ago: 'appointments_next',
+      dont_remember: 'appointments_next',
+    },
+  },
+
+  {
+    nodeId: 'appointments_next',
+    nodeName: 'Next Appointment',
+    stage: 'appointments',
+    promptText: "Do you already have your next appointment scheduled?",
+    empathyGuidance: 'Ask casually. If no appointment exists and symptoms are active, this is a critical control point. Do not allow the call to close without addressing this.',
+    purposeText: 'Determine appointment continuity. If no next appointment exists and symptoms remain, barrier analysis is mandatory.',
+    answerOptions: [
+      { id: 'scheduled', label: 'Yes — appointment scheduled', description: 'Has a confirmed next visit' },
+      { id: 'not_scheduled', label: 'No — nothing scheduled', description: 'No upcoming appointment' },
+      { id: 'waiting_callback', label: 'Waiting for provider callback', description: 'Has reached out but no confirmation' },
+      { id: 'referral_not_scheduled', label: 'Referral made but not scheduled', description: 'Was referred but hasn\'t scheduled' },
+      { id: 'finished_no_next', label: 'Finished with current provider', description: 'Discharged or completed with provider, no next step' },
+      { id: 'not_sure', label: 'Not sure', description: 'Client doesn\'t know' },
+    ],
+    followUpProbes: [
+      'When is that appointment?',
+      'Which provider is it with?',
+      'Would it help if we helped you get that scheduled?',
+    ],
+    fieldUpdates: [{ field: 'nextAppointmentStatus', value: (answer: string) => answer }],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [
+      { condition: 'if_answer', answerIds: ['not_scheduled', 'referral_not_scheduled'], task: { type: 'followup', description: 'No next appointment — follow up in 48hrs to confirm scheduling', owner: '', urgency: 'high', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: ['nextAppointmentStatus'],
+    nextNodeMap: {
+      scheduled: 'progression_main',
+      not_scheduled: 'barriers_main',
+      waiting_callback: 'progression_main',
+      referral_not_scheduled: 'barriers_main',
+      finished_no_next: 'direction_demand_check',
+      not_sure: 'barriers_main',
+    },
+  },
+
+  // ======================== BARRIERS ========================
+  {
+    nodeId: 'barriers_main',
+    nodeName: 'Barrier Identification',
+    stage: 'barriers',
+    promptText: "I understand. What has made it hard to keep treatment moving the way it should?",
+    empathyGuidance: 'This is a sensitive question. Lead with understanding, not judgment. Many barriers are legitimate and the client may feel ashamed. Validate whatever they share: "That makes sense" or "I can understand how that would make things harder."',
+    purposeText: 'Identify the specific barrier preventing treatment continuity. Each barrier type triggers different support, actions, and case direction considerations.',
+    answerOptions: [
+      { id: 'work_schedule', label: 'Work schedule', description: 'Work conflicts with appointments' },
+      { id: 'transportation', label: 'Transportation', description: 'No reliable way to get there' },
+      { id: 'childcare', label: 'Childcare', description: 'Cannot arrange childcare' },
+      { id: 'provider_too_far', label: 'Provider too far', description: 'Distance is a problem' },
+      { id: 'provider_not_responsive', label: 'Provider not responsive', description: 'Office not returning calls' },
+      { id: 'felt_better_stopped', label: 'Felt better and stopped', description: 'Client felt improved' },
+      { id: 'didnt_understand_next_step', label: "Didn't understand next step", description: 'Confused about what to do' },
+      { id: 'dissatisfied_with_provider', label: 'Dissatisfied with provider', description: 'Does not like/trust provider' },
+      { id: 'nervous_anxious', label: 'Nervous or anxious', description: 'Fear of treatment or process' },
+      { id: 'cost_concern', label: 'Worried about cost', description: 'Financial concerns' },
+      { id: 'insurance_confusion', label: 'Insurance confusion', description: 'Does not understand coverage' },
+      { id: 'pain_with_treatment', label: 'Treatment itself is painful', description: 'Treatment causes discomfort' },
+      { id: 'language_barrier', label: 'Language barrier', description: 'Communication difficulty with providers' },
+      { id: 'life_stress_overwhelmed', label: 'Life stress / overwhelmed', description: 'Too much going on' },
+      { id: 'no_referral_followup', label: 'No referral follow-up', description: 'Referral was made but nobody followed up' },
+      { id: 'other', label: 'Other', description: 'Something else' },
+    ],
+    followUpProbes: [
+      'How long has this been going on?',
+      'Is there anything we could do to help with that?',
+      'Would it help if we tried to find a closer provider or different schedule?',
+    ],
+    fieldUpdates: [{ field: 'barrierType', value: (answer: string) => answer }],
+    scoreUpdates: [{ score: 'barrierSeverityScore', adjustment: 15 }],
+    directionUpdates: [],
+    taskRules: [
+      { condition: 'if_answer', answerIds: ['provider_not_responsive', 'no_referral_followup'], task: { type: 'provider_followup', description: 'Follow up with provider office to resolve scheduling', owner: '', urgency: 'high', relatedCaseId: '' } },
+      { condition: 'if_answer', answerIds: ['transportation', 'language_barrier'], task: { type: 'support', description: 'Arrange logistics support for client', owner: '', urgency: 'medium', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: ['barrierType'],
+    nextNodeMap: {
+      work_schedule: 'barriers_resolve',
+      transportation: 'barriers_resolve',
+      childcare: 'barriers_resolve',
+      provider_too_far: 'barriers_resolve',
+      provider_not_responsive: 'barriers_resolve',
+      felt_better_stopped: 'direction_demand_check',
+      didnt_understand_next_step: 'barriers_resolve',
+      dissatisfied_with_provider: 'barriers_provider_dissatisfaction',
+      nervous_anxious: 'barriers_resolve_emotional',
+      cost_concern: 'barriers_resolve',
+      insurance_confusion: 'barriers_resolve',
+      pain_with_treatment: 'barriers_resolve',
+      language_barrier: 'barriers_resolve',
+      life_stress_overwhelmed: 'barriers_resolve_emotional',
+      no_referral_followup: 'barriers_resolve',
+      other: 'barriers_resolve',
+    },
+  },
+
+  {
+    nodeId: 'barriers_resolve',
+    nodeName: 'Barrier Resolution',
+    stage: 'barriers',
+    promptText: "I completely understand, and I appreciate you telling me that. Let me see what we can do to help get things moving again. Would it be helpful if we [helped find a closer provider / called the office for you / worked out a different schedule]?",
+    empathyGuidance: 'Validate first, then problem-solve. Be specific about what you can do. Do not promise what you cannot deliver. The goal is a concrete next step.',
+    purposeText: 'Move from barrier identification to resolution. The call should not end with only a barrier identified — there must be movement toward solving it.',
+    answerOptions: [
+      { id: 'accepts_help', label: 'Accepts help', description: 'Client willing to let you help resolve' },
+      { id: 'will_handle_self', label: 'Will handle it themselves', description: 'Client prefers to resolve on their own' },
+      { id: 'barrier_unsolvable', label: 'Barrier seems persistent', description: 'Not easily resolvable' },
+    ],
+    followUpProbes: [
+      'What would make this easier for you?',
+      'If we could get this scheduled for you, would you be able to go?',
+    ],
+    fieldUpdates: [],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [
+      { condition: 'if_answer', answerIds: ['accepts_help'], task: { type: 'barrier_resolution', description: 'Help client resolve barrier and re-engage treatment', owner: '', urgency: 'high', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      accepts_help: 'progression_main',
+      will_handle_self: 'progression_main',
+      barrier_unsolvable: 'direction_assessment',
+    },
+  },
+
+  {
+    nodeId: 'barriers_resolve_emotional',
+    nodeName: 'Emotional Barrier Support',
+    stage: 'barriers',
+    promptText: "I hear you. It sounds like a lot has been going on. I want you to know that it's completely normal to feel that way, and we're here to support you through this. Let's take it one step at a time. What feels like the most manageable next step for you right now?",
+    empathyGuidance: 'SLOW DOWN. Use simpler language. Break the issue into smaller steps. Reassure the client. Focus on the most immediate, smallest next move. Avoid flooding with too many questions. Be warm and patient.',
+    purposeText: 'Support an overwhelmed or anxious client toward a single next step. Do not try to solve everything at once.',
+    answerOptions: [
+      { id: 'willing_small_step', label: 'Willing to take a small step', description: 'Client open to one next thing' },
+      { id: 'too_overwhelmed', label: 'Too overwhelmed right now', description: 'Needs more time' },
+      { id: 'wants_help', label: 'Wants firm to help arrange', description: 'Asking for support' },
+    ],
+    followUpProbes: [
+      'Would it help if I called the office for you?',
+      'What if we just focused on one appointment — nothing else right now?',
+    ],
+    fieldUpdates: [{ field: 'clientEmotionalState', value: 'overwhelmed' }],
+    scoreUpdates: [{ score: 'clientEngagementScore', adjustment: -5 }],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      willing_small_step: 'progression_main',
+      too_overwhelmed: 'next_step_secure',
+      wants_help: 'progression_main',
+    },
+  },
+
+  {
+    nodeId: 'barriers_provider_dissatisfaction',
+    nodeName: 'Provider Dissatisfaction',
+    stage: 'barriers',
+    promptText: "I\'m sorry to hear that. Can you tell me more about what happened? Sometimes a different provider can make a big difference, and I may be able to help with that.",
+    empathyGuidance: 'Validate frustration first: "That sounds really frustrating." Do not defend the provider. Focus on understanding the issue and whether a change is needed.',
+    purposeText: 'Determine if provider dissatisfaction is blocking care and whether a referral to a different provider is needed.',
+    answerOptions: [
+      { id: 'wants_new_provider', label: 'Wants a different provider', description: 'Client wants to switch' },
+      { id: 'issue_resolvable', label: 'Issue might be resolvable', description: 'Could be addressed without switching' },
+      { id: 'gave_up_on_treatment', label: 'Gave up on treatment because of it', description: 'Dissatisfaction caused treatment stop' },
+    ],
+    followUpProbes: [
+      'How long has this been an issue?',
+      'What specifically happened that made you uncomfortable?',
+      'Would you be open to trying a different provider in the same specialty?',
+    ],
+    fieldUpdates: [{ field: 'barrierDetails', value: 'Provider dissatisfaction' }],
+    scoreUpdates: [{ score: 'providerProgressionScore', adjustment: -15 }],
+    directionUpdates: [],
+    taskRules: [
+      { condition: 'if_answer', answerIds: ['wants_new_provider'], task: { type: 'referral', description: 'Arrange alternative provider referral due to dissatisfaction', owner: '', urgency: 'high', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      wants_new_provider: 'progression_main',
+      issue_resolvable: 'progression_main',
+      gave_up_on_treatment: 'direction_assessment',
+    },
+  },
+
+  // ======================== PROGRESSION ========================
+  {
+    nodeId: 'progression_main',
+    nodeName: 'Treatment Progression Quality',
+    stage: 'progression',
+    promptText: "Do you feel like your treatment has been helping, or does it feel like things have kind of stalled out?",
+    empathyGuidance: 'Ask conversationally. If treatment feels stalled, be empathetic: "That must be frustrating." If helping, be encouraging: "That\'s really good to hear."',
+    purposeText: 'Assess whether the current treatment path is productive or plateauing. This identifies whether next-level care, continued care, or directional change is needed.',
+    answerOptions: [
+      { id: 'helping_a_lot', label: 'Helping a lot', description: 'Clear improvement from treatment' },
+      { id: 'helping_somewhat', label: 'Helping somewhat', description: 'Some improvement' },
+      { id: 'not_helping', label: 'Not helping much', description: 'Little to no improvement' },
+      { id: 'feels_stalled', label: 'Feels stalled', description: 'No progress recently' },
+      { id: 'not_sure', label: 'Not sure', description: 'Client cannot assess' },
+      { id: 'provider_discussed_next', label: 'Provider discussed next step', description: 'Doctor mentioned progression plan' },
+      { id: 'provider_not_discussed_next', label: 'Provider hasn\'t discussed next step', description: 'No progression plan discussed' },
+    ],
+    followUpProbes: [
+      'Has your doctor talked about what the next steps might be?',
+      'Do you feel like you\'re getting closer to being done with treatment?',
+      'Has anyone mentioned more tests, injections, or other procedures?',
+    ],
+    fieldUpdates: [{ field: 'progressionQuality', value: (answer: string) => answer }],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      helping_a_lot: 'direction_demand_check',
+      helping_somewhat: 'direction_assessment',
+      not_helping: 'direction_assessment',
+      feels_stalled: 'direction_assessment',
+      not_sure: 'direction_assessment',
+      provider_discussed_next: 'direction_demand_check',
+      provider_not_discussed_next: 'direction_assessment',
+    },
+  },
+
+  // ======================== DIRECTION ========================
+  {
+    nodeId: 'direction_demand_check',
+    nodeName: 'Demand Readiness Check',
+    stage: 'direction',
+    promptText: "It sounds like things may be stabilizing. Just a couple more questions to help me understand where things are headed. Has any provider told you that more treatment is still expected?",
+    empathyGuidance: 'Be positive and supportive. This is not a pressure question — frame it as wanting to understand the full picture for the client\'s benefit.',
+    purposeText: 'Gather demand-readiness indicators. Determine if treatment is truly wrapping up or if there are unresolved next steps.',
+    answerOptions: [
+      { id: 'more_treatment_expected', label: 'Yes — more treatment expected', description: 'Provider has outlined more care' },
+      { id: 'no_more_expected', label: 'No — provider says done/stable', description: 'Treatment appears complete' },
+      { id: 'tests_pending', label: 'Tests or referrals still pending', description: 'Outstanding diagnostic/referral work' },
+      { id: 'condition_still_changing', label: 'Condition still changing', description: 'Medical picture not yet stable' },
+      { id: 'not_sure', label: 'Not sure', description: 'Client doesn\'t know' },
+    ],
+    followUpProbes: [
+      'Are there any appointments, referrals, tests, or procedures still pending?',
+      'Do you feel your condition is still changing, or has it become more stable?',
+      'Has any doctor talked about being done, or about what happens next?',
+    ],
+    fieldUpdates: [],
+    scoreUpdates: [],
+    directionUpdates: [
+      { direction: 'demand_readiness_review', weight: 1 },
+    ],
+    taskRules: [
+      { condition: 'if_answer', answerIds: ['no_more_expected'], task: { type: 'demand_review', description: 'Flag for demand-readiness review — client reports treatment stable/complete', owner: '', urgency: 'medium', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      more_treatment_expected: 'next_step_secure',
+      no_more_expected: 'next_step_secure',
+      tests_pending: 'next_step_secure',
+      condition_still_changing: 'next_step_secure',
+      not_sure: 'next_step_secure',
+    },
+  },
+
+  {
+    nodeId: 'direction_assessment',
+    nodeName: 'Direction Assessment',
+    stage: 'direction',
+    promptText: "Thank you for all of that information. Based on what you've shared, I want to make sure we're thinking about the best path forward for you. Let me confirm — are you planning to continue with treatment, or are you feeling like you may be done?",
+    empathyGuidance: 'This is a pivotal question. Be gentle and non-leading. The client should not feel pushed in either direction. Whatever they say, validate it.',
+    purposeText: 'Final directional assessment before close-out. Clarify whether the case remains on treatment path or may need internal review for demand, litigation, cut, or transfer.',
+    answerOptions: [
+      { id: 'continuing_treatment', label: 'Planning to continue treatment', description: 'Client committed to ongoing care' },
+      { id: 'probably_done', label: 'Probably done with treatment', description: 'Client feels finished' },
+      { id: 'unsure_direction', label: 'Unsure what to do next', description: 'Client uncertain about path' },
+      { id: 'frustrated_done', label: 'Frustrated — wants to be done', description: 'Client tired of process' },
+      { id: 'wants_more_treatment', label: 'Wants more/different treatment', description: 'Client wants to escalate care' },
+    ],
+    followUpProbes: [
+      'What would be most helpful for you right now?',
+      'Is there anything you feel we should be doing differently?',
+    ],
+    fieldUpdates: [{ field: 'directionAssessment', value: (answer: string) => {
+      const map: Record<string, string> = {
+        continuing_treatment: 'continue_treatment_optimization',
+        probably_done: 'demand_readiness_review',
+        unsure_direction: 'unresolved',
+        frustrated_done: 'closer_monitoring',
+        wants_more_treatment: 'next_level_care',
+      }
+      return map[answer] || 'unresolved'
+    }}],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      continuing_treatment: 'next_step_secure',
+      probably_done: 'next_step_secure',
+      unsure_direction: 'next_step_secure',
+      frustrated_done: 'next_step_secure',
+      wants_more_treatment: 'next_step_secure',
+    },
+  },
+
+  // ======================== NEXT STEP ========================
+  {
+    nodeId: 'next_step_secure',
+    nodeName: 'Secure Next Step',
+    stage: 'next_step',
+    promptText: "Okay, great. So just to make sure we\'re on the same page — what is the next step for you? Whether it's an appointment, a call to a provider, or something else, I want to make sure we both know what's happening next.",
+    empathyGuidance: 'Be clear but not pushy. The client should feel like you are both working together toward clarity, not being managed. If they are vague, gently press for specifics.',
+    purposeText: 'Every call must end with a concrete next step. "I\'ll let you know" is not sufficient. Secure a specific commitment or understanding.',
+    answerOptions: [
+      { id: 'specific_appointment', label: 'Has specific appointment', description: 'Date and provider confirmed' },
+      { id: 'will_schedule', label: 'Will schedule this week', description: 'Committed to scheduling soon' },
+      { id: 'firm_will_help', label: 'Firm will help arrange', description: 'CM taking action to set up' },
+      { id: 'callback_planned', label: 'Callback planned', description: 'CM will call back to confirm' },
+      { id: 'no_clear_step', label: 'No clear next step', description: 'Unable to secure commitment' },
+    ],
+    followUpProbes: [
+      'When specifically will you call them?',
+      'Can I follow up with you on [day] to make sure it got scheduled?',
+      'Would it help if I made that call for you?',
+    ],
+    fieldUpdates: [{ field: 'bestNextAction', value: (answer: string) => answer }],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [
+      { condition: 'if_answer', answerIds: ['callback_planned', 'firm_will_help'], task: { type: 'followup', description: 'Follow up to confirm next step was completed', owner: '', urgency: 'medium', relatedCaseId: '' } },
+    ],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      specific_appointment: 'closeout_summary',
+      will_schedule: 'closeout_summary',
+      firm_will_help: 'closeout_summary',
+      callback_planned: 'closeout_summary',
+      no_clear_step: 'closeout_summary',
+    },
+  },
+
+  // ======================== CLOSE-OUT ========================
+  {
+    nodeId: 'closeout_summary',
+    nodeName: 'Call Close-Out',
+    stage: 'closeout',
+    promptText: "Alright [Client First Name], thank you so much for taking the time to talk with me today. Just to recap — [summarize key points]. I'm going to [state next action]. Is there anything else you need from me before we wrap up?",
+    empathyGuidance: 'End on a warm, supportive note. The client should feel cared about and clear on what happens next. Thank them sincerely for their time.',
+    purposeText: 'Confirm the shared understanding of the call outcome, verify next steps, and close with empathy and clarity. The client should leave the call feeling supported.',
+    answerOptions: [
+      { id: 'all_good', label: 'Client has no questions — all good', description: 'Clean close' },
+      { id: 'has_question', label: 'Client has a question', description: 'Additional question before close' },
+      { id: 'thanks_appreciative', label: 'Client is thankful/appreciative', description: 'Positive close' },
+    ],
+    followUpProbes: [
+      'Don\'t hesitate to call us if anything changes or you need anything.',
+      'We\'ll follow up with you on [date] to check in.',
+      'Take care of yourself, and don\'t hesitate to reach out.',
+    ],
+    fieldUpdates: [{ field: 'engagementLevel', value: 'engaged' }],
+    scoreUpdates: [],
+    directionUpdates: [],
+    taskRules: [],
+    escalationRules: [],
+    requiredCompletionFlags: [],
+    nextNodeMap: {
+      all_good: 'COMPLETE',
+      has_question: 'COMPLETE',
+      thanks_appreciative: 'COMPLETE',
+    },
+  },
+]
+
+// ============================================================
+// Access Functions
+// ============================================================
+
+export function getNode(nodeId: string): CallNode | undefined {
+  return nodes.find((n) => n.nodeId === nodeId)
+}
+
+export function getStartNode(): CallNode {
+  return nodes.find((n) => n.nodeId === 'opening_greeting')!
+}
+
+export function getAllNodes(): CallNode[] {
+  return nodes
+}
+
+export function getNodesByStage(stage: string): CallNode[] {
+  return nodes.filter((n) => n.stage === stage)
+}
