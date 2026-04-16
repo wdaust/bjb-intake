@@ -97,7 +97,7 @@ export function ManagerDashboard() {
   // Team Metrics
   const totalCases = allCases.length
   const withNextAppt = allCases.filter((c) => c.treatment.nextAppointmentDate).length
-  const avgUrgency = Math.round(allCases.reduce((sum, c) => sum + c.scores.urgencyScore, 0) / totalCases)
+  const avgUrgency = totalCases > 0 ? Math.round(allCases.reduce((sum, c) => sum + c.scores.urgencyScore, 0) / totalCases) : 0
   const stagnating = allCases.filter((c) => c.operational.treatmentGapDays > 14).length
   const highRisk = allCases.filter((c) => c.scores.urgencyScore >= 70).length
 

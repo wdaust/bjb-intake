@@ -180,7 +180,7 @@ export function Caseload() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Caseload</h1>
           <p className="text-sm text-muted-foreground">
-            {allCases.length} cases{selectedCmName ? ` — ${selectedCmName}` : ''}
+            {filteredCases.length} case{filteredCases.length !== 1 ? 's' : ''}{filteredCases.length !== allCases.length ? ` (${allCases.length} total)` : ''}{selectedCmName ? ` — ${selectedCmName}` : ''}
           </p>
         </div>
         <Select

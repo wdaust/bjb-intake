@@ -156,7 +156,7 @@ async function syncTeamMembers() {
     SELECT Id, Name, litify_pm__Matter__c, litify_pm__User__c, Role_Name__c
     FROM litify_pm__Matter_Team_Member__c
     WHERE litify_pm__Matter__c != null
-    LIMIT 2000
+    ORDER BY SystemModstamp DESC
   `)
   const rows = records.map(r => [
     r.Id, r.litify_pm__Matter__c, r.litify_pm__User__c, r.Role_Name__c,
@@ -176,7 +176,7 @@ async function syncInjuries() {
            Current_Injury_Status__c, litify_pm__Is_Diagnosed__c
     FROM litify_pm__Injury__c
     WHERE litify_pm__Matter__c != null
-    LIMIT 2000
+    ORDER BY SystemModstamp DESC
   `)
   const rows = records.map(r => [
     r.Id, r.litify_pm__Matter__c, r.litify_pm__Body_Part__c, r.litify_pm__Area_Affected__c,
@@ -197,7 +197,7 @@ async function syncDamages() {
            litify_pm__Amount_Paid__c, litify_pm__Service_Start_Date__c, litify_pm__Service_End_Date__c
     FROM litify_pm__Damage__c
     WHERE litify_pm__Matter__c != null
-    LIMIT 2000
+    ORDER BY SystemModstamp DESC
   `)
   const rows = records.map(r => [
     r.Id, r.litify_pm__Matter__c, r.litify_pm__Provider_Name__c,
@@ -221,8 +221,7 @@ async function syncTasks() {
            litify_pm__Matter__c, OwnerId
     FROM Task
     WHERE litify_pm__Matter__c != null
-    ORDER BY ActivityDate DESC
-    LIMIT 2000
+    ORDER BY SystemModstamp DESC
   `)
   const rows = records.map(r => [
     r.Id, r.Subject, r.WhatId, r.WhoId, r.Status, r.Priority, r.Type,
@@ -245,8 +244,7 @@ async function syncEvents() {
            litify_pm__Matter__c
     FROM Event
     WHERE litify_pm__Matter__c != null
-    ORDER BY StartDateTime DESC
-    LIMIT 2000
+    ORDER BY SystemModstamp DESC
   `)
   const rows = records.map(r => [
     r.Id, r.Subject, r.WhatId, r.WhoId, r.Type,
@@ -272,8 +270,7 @@ async function syncIntakes() {
            litify_pm__IsConverted__c, litify_pm__Qualified__c,
            litify_pm__Case_State__c, Practice_Area__c
     FROM litify_pm__Intake__c
-    ORDER BY litify_pm__Open_Date__c DESC
-    LIMIT 2000
+    ORDER BY SystemModstamp DESC
   `)
   const rows = records.map(r => [
     r.Id, r.Name, r.litify_pm__Display_Name__c, r.litify_pm__Status__c,

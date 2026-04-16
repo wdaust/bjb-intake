@@ -158,7 +158,7 @@ export function GuidedCall() {
   }
 
   if (!cv) {
-    return <p className="text-muted-foreground">Case not found.</p>
+    return <p className="text-muted-foreground">Loading case data...</p>
   }
 
   if (callComplete) {
