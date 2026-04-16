@@ -77,12 +77,10 @@ async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
             c.mailing_street, c.mailing_city,
             atty.name as attorney_name
           FROM sf_matters m
-          LEFT JOIN sf_contacts c ON m.client_id = c.sf_id
+          LEFT JOIN sf_contacts c ON m.client_id = c.account_id
           LEFT JOIN sf_users atty ON m.principal_attorney_id = atty.sf_id
           INNER JOIN sf_team_members tm ON tm.matter_id = m.sf_id AND tm.user_id = ${cmUserId}
           WHERE m.status NOT IN ('Closed', 'Resolved')
-            AND c.first_name IS NOT NULL
-            AND c.last_name IS NOT NULL
             AND m.pi_status IS NOT NULL
           ORDER BY m.open_date DESC NULLS LAST
           LIMIT 200
@@ -100,14 +98,12 @@ async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
             c.mailing_street, c.mailing_city,
             atty.name as attorney_name
           FROM sf_matters m
-          LEFT JOIN sf_contacts c ON m.client_id = c.sf_id
+          LEFT JOIN sf_contacts c ON m.client_id = c.account_id
           LEFT JOIN sf_users atty ON m.principal_attorney_id = atty.sf_id
           WHERE m.status NOT IN ('Closed', 'Resolved')
-            AND c.first_name IS NOT NULL
-            AND c.last_name IS NOT NULL
             AND m.pi_status IS NOT NULL
           ORDER BY m.open_date DESC NULLS LAST
-          LIMIT 100
+          LIMIT 200
         `
 
     if (matters.length === 0) return getMockCases()
@@ -173,12 +169,26 @@ async function fetchCasesFromNeon(cmUserId?: string): Promise<FullCaseView[]> {
       const treatmentGapDays = lastTreatmentDate ? daysSinceDate(lastTreatmentDate) : 999
       const noContactDays = lastContactDate ? daysSinceDate(lastContactDate) : 999
 
-      const clientName = `${m.client_first || ''} ${m.client_last || ''}`.trim()
+      // Extract client name: prefer contact data, fallback to display_name parsing
+      let clientName = `${m.client_first || ''} ${m.client_last || ''}`.trim()
+      let preferredName = m.client_first as string | undefined
+      if (!clientName) {
+        const dn = (m.display_name as string) || ''
+        // Try "a/s/o <Name>" pattern
+        const asoMatch = dn.match(/a\/s\/o\s+(.+?)(?:\s+vs\b|$)/i)
+        if (asoMatch) {
+          clientName = asoMatch[1].trim()
+        } else {
+          // Use display_name up to first " -- " or " | " delimiter
+          clientName = dn.split(/\s*(?:--|[|])\s*/)[0].trim() || dn
+        }
+        preferredName = clientName.split(' ')[0] || undefined
+      }
 
       const client: Client = {
         id: m.client_id as string || mid,
-        fullName: clientName || (m.display_name as string) || 'Unknown',
-        preferredName: m.client_first as string || undefined,
+        fullName: clientName || 'Unknown',
+        preferredName,
         phone: (m.client_phone as string) || '—',
         email: (m.client_email as string) || undefined,
         preferredContactMethod: 'phone',

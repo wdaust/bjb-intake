@@ -72,13 +72,32 @@ async function syncUsers() {
 
 async function syncContacts() {
   console.log('[SYNC] Contacts...')
-  const records = await queryAll<Record<string, unknown>>(`
-    SELECT Id, AccountId, FirstName, LastName, Email, Phone, MobilePhone,
-           MailingStreet, MailingCity, MailingState, MailingPostalCode, Birthdate
-    FROM Contact
-    ORDER BY LastModifiedDate DESC
-    LIMIT 2000
-  `)
+  // Step 1: Get client IDs from open matters (from our Neon DB)
+  const clientIdRows = await pool.query(`SELECT DISTINCT client_id FROM sf_matters WHERE client_id IS NOT NULL AND status NOT IN ('Closed', 'Resolved')`)
+  const allClientIds = clientIdRows.rows.map((r: Record<string, unknown>) => r.client_id as string)
+  console.log(`  Found ${allClientIds.length} distinct client IDs from matters`)
+
+  // Note: litify_pm__Client__c is an Account ID (prefix 001), not Contact ID (003)
+  // Step 2: Batch fetch contacts by AccountId in chunks of 200
+  const allRecords: Record<string, unknown>[] = []
+  for (let i = 0; i < allClientIds.length; i += 200) {
+    const batch = allClientIds.slice(i, i + 200)
+    const idList = batch.map(id => `'${id}'`).join(',')
+    const soql = `
+      SELECT Id, AccountId, FirstName, LastName, Email, Phone, MobilePhone,
+             MailingStreet, MailingCity, MailingState, MailingPostalCode, Birthdate
+      FROM Contact
+      WHERE AccountId IN (${idList})
+    `
+    try {
+      const records = await queryAll<Record<string, unknown>>(soql)
+      allRecords.push(...records)
+    } catch (err) {
+      console.warn(`  Batch ${i}-${i+200} failed:`, (err as Error).message.slice(0, 100))
+    }
+    if (i > 0 && i % 1000 === 0) console.log(`  ... fetched ${allRecords.length} contacts so far`)
+  }
+  const records = allRecords
   const rows = records.map(r => [
     r.Id, r.AccountId, r.FirstName, r.LastName, r.Email, r.Phone, r.MobilePhone,
     r.MailingStreet, r.MailingCity, r.MailingState, r.MailingPostalCode, r.Birthdate, null,
