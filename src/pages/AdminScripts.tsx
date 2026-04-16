@@ -1,7 +1,38 @@
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { getScripts, getQuestionCount } from '@/db/queries'
+
+interface ScriptDisplay {
+  id: string
+  name: string
+  description: string | null
+  questionCount: number
+  updatedAt: Date
+}
 
 export function AdminScripts() {
+  const [scriptList, setScriptList] = useState<ScriptDisplay[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const rows = await getScripts()
+      const display = await Promise.all(
+        rows.map(async (s) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          questionCount: await getQuestionCount(s.id),
+          updatedAt: s.updatedAt,
+        }))
+      )
+      setScriptList(display)
+      setLoading(false)
+    }
+    load()
+  }, [])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -11,21 +42,28 @@ export function AdminScripts() {
             Create and edit intake scripts with guided questions.
           </p>
         </div>
-        <Button>New Script</Button>
+        <Button disabled>New Script</Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>PI Auto Accident</CardTitle>
-          <CardDescription>
-            12 questions — Last updated Apr 16, 2026
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex gap-2">
-          <Button variant="outline" size="sm">Edit</Button>
-          <Button variant="outline" size="sm">Preview</Button>
-        </CardContent>
-      </Card>
+      {loading ? (
+        <p className="text-muted-foreground">Loading scripts...</p>
+      ) : (
+        scriptList.map((s) => (
+          <Card key={s.id}>
+            <CardHeader>
+              <CardTitle>{s.name}</CardTitle>
+              <CardDescription>
+                {s.questionCount} question{s.questionCount !== 1 ? 's' : ''} — Last updated {new Date(s.updatedAt).toLocaleDateString()}
+              </CardDescription>
+            </CardHeader>
+            {s.description && (
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{s.description}</p>
+              </CardContent>
+            )}
+          </Card>
+        ))
+      )}
     </div>
   )
 }
