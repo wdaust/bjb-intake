@@ -32,12 +32,14 @@ function mapStage(matterStage?: string | null, piStatus?: string | null): CaseSt
 }
 
 // Fetch available case managers / paralegals for the CM selector
-export async function getCaseManagers(): Promise<{ id: string; name: string; role: string }[]> {
+export async function getCaseManagers(): Promise<{ id: string; name: string; role: string; caseCount: number }[]> {
   try {
     const rows = await sql`
-      SELECT DISTINCT u.sf_id, u.name, tm.role_name
+      SELECT u.sf_id, u.name, tm.role_name,
+             COUNT(DISTINCT tm.matter_id) as case_count
       FROM sf_team_members tm
       JOIN sf_users u ON tm.user_id = u.sf_id
+      JOIN sf_matters m ON tm.matter_id = m.sf_id AND m.status NOT IN ('Closed', 'Resolved') AND m.pi_status IS NOT NULL
       WHERE tm.role_name IS NOT NULL
         AND u.name IS NOT NULL
         AND (
@@ -46,12 +48,14 @@ export async function getCaseManagers(): Promise<{ id: string; name: string; rol
           OR tm.role_name ILIKE '%medical%'
           OR tm.role_name ILIKE '%attorney%'
         )
+      GROUP BY u.sf_id, u.name, tm.role_name
       ORDER BY u.name
     `
     return rows.map((r: Record<string, unknown>) => ({
       id: r.sf_id as string,
       name: r.name as string,
       role: r.role_name as string,
+      caseCount: Number(r.case_count),
     }))
   } catch {
     return []

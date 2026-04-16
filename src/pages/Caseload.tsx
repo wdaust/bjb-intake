@@ -122,7 +122,7 @@ export function Caseload() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortCriteria>('treatment_gap')
   const [filterPreset, setFilterPreset] = useState('all')
-  const [cmList, setCmList] = useState<{ id: string; name: string; role: string }[]>([])
+  const [cmList, setCmList] = useState<{ id: string; name: string; role: string; caseCount: number }[]>([])
   const [selectedCm, setSelectedCm] = useState<string>('')
   const [selectedCmName, setSelectedCmName] = useState<string>('')
 
@@ -202,7 +202,7 @@ export function Caseload() {
             <SelectItem value="__all__">All Cases</SelectItem>
             {cmList.map((cm) => (
               <SelectItem key={cm.id} value={cm.id}>
-                {cm.name} ({cm.role})
+                {cm.name} — {cm.caseCount} cases ({cm.role})
               </SelectItem>
             ))}
           </SelectContent>
