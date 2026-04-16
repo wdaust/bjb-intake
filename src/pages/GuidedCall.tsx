@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { getCaseByIdLive } from '@/data/liveData'
 import { getNode, getStartNode } from '@/data/callFlowNodes'
-import type { CallNode, CapturedCallData, CaseDirection, CallStage, TaskItem, FullCaseView } from '@/types'
+import type { CallNode, CapturedCallData, CallStage, TaskItem, FullCaseView } from '@/types'
 
 const STAGE_LABELS: Record<CallStage, string> = {
   opening: 'Opening',
@@ -25,32 +25,6 @@ const STAGE_ORDER: CallStage[] = [
   'barriers', 'progression', 'direction', 'next_step', 'closeout',
 ]
 
-const DIRECTION_LABELS: Record<CaseDirection, string> = {
-  continue_treatment_optimization: 'Continue Treatment',
-  closer_monitoring: 'Closer Monitoring',
-  urgent_re_engagement: 'Urgent Re-Engagement',
-  next_level_care: 'Next-Level Care',
-  demand_readiness_review: 'Demand Review',
-  litigation_review: 'Litigation Review',
-  cut_review: 'Cut Review',
-  transfer_review: 'Transfer Review',
-  escalate_for_review: 'Escalate',
-  unresolved: 'Unresolved',
-}
-
-const DIRECTION_COLORS: Record<string, string> = {
-  continue_treatment_optimization: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  closer_monitoring: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
-  urgent_re_engagement: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  next_level_care: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  demand_readiness_review: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
-  litigation_review: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-  cut_review: 'bg-red-500/15 text-red-400 border-red-500/30',
-  transfer_review: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  escalate_for_review: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
-  unresolved: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
-}
-
 export function GuidedCall() {
   const { caseId } = useParams<{ caseId: string }>()
   const navigate = useNavigate()
@@ -63,9 +37,7 @@ export function GuidedCall() {
   const [currentNode, setCurrentNode] = useState<CallNode>(getStartNode())
   const [history, setHistory] = useState<{ nodeId: string; answerId: string }[]>([])
   const [capturedData, setCapturedData] = useState<CapturedCallData>({})
-  const [currentDirection, setCurrentDirection] = useState<CaseDirection>('unresolved')
   const [directionWeights, setDirectionWeights] = useState<Record<string, number>>({})
-  const [bestNextMove, setBestNextMove] = useState('Begin call and assess treatment status')
   const [tasks, setTasks] = useState<TaskItem[]>([])
   const [freeTextInput, setFreeTextInput] = useState('')
   const [showFollowUp, setShowFollowUp] = useState(false)
@@ -93,21 +65,12 @@ export function GuidedCall() {
     }
     setDirectionWeights(newWeights)
 
-    // Calculate top direction
-    const sorted = Object.entries(newWeights).sort(([, a], [, b]) => b - a)
-    if (sorted.length > 0 && sorted[0][1] > 0) {
-      setCurrentDirection(sorted[0][0] as CaseDirection)
-    }
-
     // Apply task rules
     for (const tr of currentNode.taskRules) {
       if (tr.condition === 'always' || (tr.condition === 'if_answer' && tr.answerIds?.includes(answerId))) {
         setTasks((prev) => [...prev, { ...tr.task, id: `task-${Date.now()}`, status: 'pending' }])
       }
     }
-
-    // Update best next move based on context
-    updateBestNextMove(newData, answerId, currentNode)
 
     // Navigate to next node
     const nextNodeId = currentNode.nextNodeMap[answerId] || currentNode.nextNodeMap['default']
@@ -122,32 +85,6 @@ export function GuidedCall() {
       setShowFollowUp(false)
     }
   }, [currentNode, capturedData, directionWeights])
-
-  function updateBestNextMove(_data: CapturedCallData, answerId: string, node: CallNode) {
-    if (node.stage === 'treatment_status') {
-      if (answerId === 'stopped_treating' || answerId === 'never_started') {
-        setBestNextMove('Identify barriers and determine if treatment can be re-engaged')
-      } else if (answerId === 'actively_treating') {
-        setBestNextMove('Confirm appointment continuity and symptom direction')
-      } else if (answerId === 'inconsistent') {
-        setBestNextMove('Identify barrier pattern and stabilize treatment')
-      }
-    } else if (node.stage === 'symptoms') {
-      if (answerId === 'worse') {
-        setBestNextMove('Assess whether current treatment is sufficient or escalation needed')
-      } else if (answerId === 'better' || answerId === 'resolved') {
-        setBestNextMove('Clarify whether treatment is complete or still expected')
-      }
-    } else if (node.stage === 'appointments') {
-      if (answerId === 'not_scheduled') {
-        setBestNextMove('Barrier identification mandatory — do not close without next-step clarity')
-      }
-    } else if (node.stage === 'barriers') {
-      setBestNextMove('Resolve barrier and secure concrete next step')
-    } else if (node.stage === 'direction') {
-      setBestNextMove('Confirm case direction and prepare close-out')
-    }
-  }
 
   function handleBack() {
     if (history.length === 0) return
@@ -169,7 +106,7 @@ export function GuidedCall() {
             <h1 className="text-2xl font-bold text-emerald-400 mb-2">Call Complete</h1>
             <p className="text-emerald-300/80 mb-6">Session data has been captured. Review the post-call summary.</p>
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate(`/summary/${caseId}`, { state: { capturedData, tasks, direction: currentDirection } })}>
+              <Button onClick={() => navigate(`/summary/${caseId}`, { state: { capturedData, tasks, direction: 'unresolved' } })}>
                 View Post-Call Summary
               </Button>
               <Button variant="outline" onClick={() => navigate('/')}>
@@ -314,71 +251,40 @@ export function GuidedCall() {
         </div>
       </div>
 
-      {/* RIGHT COLUMN — Side Panels (Zones 6-9) */}
-      <div className="col-span-4 space-y-4">
-        {/* Zone 6: Data Capture Panel */}
-        <Card>
+      {/* RIGHT COLUMN — Call Notes */}
+      <div className="col-span-4 space-y-3">
+        <Card className="h-full flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Data Captured</CardTitle>
+            <CardTitle className="text-sm">Call Notes</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1.5 text-xs">
-            <DataField label="Treatment Status" value={capturedData.treatmentStatus} />
-            <DataField label="Last Appointment" value={capturedData.lastAppointmentDate} />
-            <DataField label="Next Appointment" value={capturedData.nextAppointmentDate || capturedData.nextAppointmentStatus} />
-            <DataField label="Symptoms" value={capturedData.symptomDirection} />
-            <DataField label="Barrier" value={capturedData.barrierType} />
-            <DataField label="Progression" value={capturedData.progressionQuality} />
-            <DataField label="Engagement" value={capturedData.engagementLevel} />
-          </CardContent>
-        </Card>
-
-        {/* Zone 7: Best Next Move */}
-        <Card className="border-blue-500/20 bg-blue-500/10">
-          <CardHeader className="pb-1">
-            <CardTitle className="text-sm text-blue-400">Best Next Move</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-blue-300/80">{bestNextMove}</p>
-          </CardContent>
-        </Card>
-
-        {/* Zone 8: Directional Assessment */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Case Direction</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1.5">
-              {Object.entries(DIRECTION_LABELS).map(([key, label]) => {
-                const weight = directionWeights[key] || 0
-                const isTop = key === currentDirection && weight > 0
-                return (
-                  <div
-                    key={key}
-                    className={`rounded px-2 py-1 text-xs flex justify-between items-center border ${
-                      isTop ? DIRECTION_COLORS[key] : 'bg-transparent border-transparent'
-                    }`}
-                  >
-                    <span className={isTop ? 'font-semibold' : 'text-muted-foreground'}>{label}</span>
-                    {weight > 0 && (
-                      <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-current rounded-full"
-                          style={{ width: `${Math.min(weight * 20, 100)}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+          <CardContent className="flex-1 flex flex-col gap-3">
+            {/* Quick tags */}
+            <div className="flex flex-wrap gap-1.5">
+              {['Appt confirmed', 'Barrier identified', 'Needs follow-up', 'Escalation needed', 'Provider issue', 'Client improving'].map(tag => (
+                <button
+                  key={tag}
+                  className="text-[10px] px-2 py-1 rounded-full border border-border/50 text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                  onClick={() => setFreeTextInput(prev => prev + (prev ? '\n' : '') + `[${tag}] `)}
+                >
+                  {tag}
+                </button>
+              ))}
             </div>
+
+            {/* Notes textarea */}
+            <Textarea
+              value={freeTextInput}
+              onChange={(e) => setFreeTextInput(e.target.value)}
+              placeholder="Type call notes here. Use quick tags above for common entries..."
+              className="flex-1 min-h-[200px] text-sm resize-none"
+            />
+
+            {/* Escalate button */}
+            <Button variant="destructive" size="sm" className="w-full" disabled>
+              Quick Escalate
+            </Button>
           </CardContent>
         </Card>
-
-        {/* Zone 9: Quick Escalate */}
-        <Button variant="destructive" size="sm" className="w-full" disabled>
-          Quick Escalate
-        </Button>
 
         {/* Tasks Created */}
         {tasks.length > 0 && (
@@ -401,13 +307,3 @@ export function GuidedCall() {
   )
 }
 
-function DataField({ label, value }: { label: string; value?: string }) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={value ? 'font-medium' : 'text-muted-foreground/50'}>
-        {value ? value.replace(/_/g, ' ') : '—'}
-      </span>
-    </div>
-  )
-}

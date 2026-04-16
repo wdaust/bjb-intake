@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { getAllCasesLive, getCaseManagers, searchCases } from '@/data/liveData'
+import { useQueue, DEFAULT_CM_ID, DEFAULT_CM_NAME } from '@/lib/QueueContext'
 import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView, SortCriteria } from '@/types'
 
@@ -123,11 +124,13 @@ export function Caseload() {
   const [sortBy, setSortBy] = useState<SortCriteria>('treatment_gap')
   const [filterPreset, setFilterPreset] = useState('all')
   const [cmList, setCmList] = useState<{ id: string; name: string; role: string; caseCount: number }[]>([])
-  const [selectedCm, setSelectedCm] = useState<string>('')
-  const [selectedCmName, setSelectedCmName] = useState<string>('')
+  const [selectedCm, setSelectedCm] = useState<string>(DEFAULT_CM_ID)
+  const [selectedCmName, setSelectedCmName] = useState<string>(DEFAULT_CM_NAME)
   const [page, setPage] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
   const [pageSize, setPageSize] = useState(50)
+
+  const { setQueue } = useQueue()
 
   // Load CM list on mount
   useEffect(() => {
@@ -142,9 +145,10 @@ export function Caseload() {
       setAllCases(result.cases)
       setTotalCount(result.totalCount)
       setPageSize(result.pageSize)
+      setQueue(result.cases) // populate queue for sidebar navigation
       setLoading(false)
     })
-  }, [selectedCm, page, search])
+  }, [selectedCm, page, search, setQueue])
 
   // Server-side search with debounce
   useEffect(() => {

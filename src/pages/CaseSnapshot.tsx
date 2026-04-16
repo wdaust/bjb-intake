@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { getCaseByIdLive } from '@/data/liveData'
+import { useQueue } from '@/lib/QueueContext'
+import { CaseQueueSidebar } from '@/components/call/CaseQueueSidebar'
 import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView } from '@/types'
 
@@ -167,16 +169,32 @@ export function CaseSnapshot() {
   const navigate = useNavigate()
   const [cv, setCv] = useState<FullCaseView | null>(null)
   const [loading, setLoading] = useState(true)
+  const { queue, setCurrentIndex } = useQueue()
 
   useEffect(() => {
     getCaseByIdLive(caseId || '').then(data => {
       setCv(data || null)
       setLoading(false)
     })
-  }, [caseId])
+    // Set queue index
+    const idx = queue.findIndex(c => c.caseData.id === caseId)
+    if (idx >= 0) setCurrentIndex(idx)
+  }, [caseId, queue, setCurrentIndex])
 
   if (loading) return <p className="text-muted-foreground">Loading case...</p>
   if (!cv) return <p className="text-muted-foreground">Case not found.</p>
+
+  return (
+    <div className="flex -mx-4 -mt-6" style={{ height: 'calc(100vh - 48px)' }}>
+      <CaseQueueSidebar />
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        <CaseSnapshotContent cv={cv} navigate={navigate} />
+      </div>
+    </div>
+  )
+}
+
+function CaseSnapshotContent({ cv, navigate }: { cv: FullCaseView; navigate: ReturnType<typeof useNavigate> }) {
 
   const whyCalling = generateWhyYouAreCalling(cv)
   const objectives = generateObjectives(cv)

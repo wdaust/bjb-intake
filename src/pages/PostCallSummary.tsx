@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { getCaseByIdLive } from '@/data/liveData'
+import { useQueue } from '@/lib/QueueContext'
 import { useState, useEffect } from 'react'
 import type { FullCaseView } from '@/types'
 import type { CapturedCallData, CaseDirection, TaskItem } from '@/types'
@@ -256,6 +257,7 @@ export function PostCallSummary() {
             <Button onClick={() => setSaved(true)} disabled={saved}>
               {saved ? 'Saved' : 'Save to Litify'}
             </Button>
+            <NextCaseButton />
             <Button variant="outline" onClick={() => navigate('/')}>
               Back to Caseload
             </Button>
@@ -266,5 +268,21 @@ export function PostCallSummary() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function NextCaseButton() {
+  const navigate = useNavigate()
+  const { nextCase, goNext } = useQueue()
+  if (!nextCase) return null
+  return (
+    <Button
+      onClick={() => {
+        const id = goNext()
+        if (id) navigate(`/case/${id}`)
+      }}
+    >
+      Next Case: {nextCase.client.fullName}
+    </Button>
   )
 }

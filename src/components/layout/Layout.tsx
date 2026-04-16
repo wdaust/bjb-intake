@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/AuthContext'
+import { useQueue } from '@/lib/QueueContext'
 
 const navItems = [
   { label: 'Caseload', path: '/' },
@@ -12,6 +13,7 @@ const navItems = [
 export function Layout() {
   const location = useLocation()
   const { user, logout } = useAuth()
+  const { cmName } = useQueue()
   const isCallScreen = location.pathname.startsWith('/call/')
 
   return (
@@ -44,7 +46,7 @@ export function Layout() {
               </nav>
               {user && (
                 <div className="flex items-center gap-2 text-xs border-l border-border/50 ml-2 pl-3">
-                  <span className="text-muted-foreground">{user.displayName || user.email}</span>
+                  <span className="text-muted-foreground">{cmName || user.displayName || user.email}</span>
                   <button
                     onClick={() => logout()}
                     className="text-[10px] text-muted-foreground/70 hover:text-foreground transition-colors"
