@@ -137,7 +137,7 @@ export function TestMode() {
     return (
       <div className="max-w-4xl mx-auto space-y-4">
         <div>
-          <h1 className="text-2xl font-bold">Test Mode</h1>
+          <h1 className="text-2xl font-bold">Demo Mode</h1>
           <p className="text-sm text-muted-foreground">
             Select a scenario to test the guided call flow. Each scenario represents a different case type and expected path through the decision tree.
           </p>
@@ -193,9 +193,9 @@ export function TestMode() {
 
         {/* Expected path hint */}
         {expected && (
-          <div className="rounded-lg bg-blue-50 border-blue-200 border px-4 py-2">
-            <p className="text-xs font-medium text-blue-900">Expected Answer</p>
-            <p className="text-sm text-blue-800">
+          <div className="rounded-lg bg-blue-500/10 border-blue-500/20 border px-4 py-2">
+            <p className="text-xs font-medium text-blue-400">Expected Answer</p>
+            <p className="text-sm text-blue-300">
               <strong>{expected.answerId}</strong> — {expected.explanation}
             </p>
           </div>
@@ -209,10 +209,10 @@ export function TestMode() {
         </Card>
 
         {/* Empathy coaching */}
-        <Card className="bg-amber-50 border-amber-200">
+        <Card className="bg-amber-500/10 border-amber-500/20">
           <CardContent className="p-3">
-            <p className="text-xs font-medium text-amber-900">Empathy Coaching</p>
-            <p className="text-sm text-amber-800">{currentNode.empathyGuidance}</p>
+            <p className="text-xs font-medium text-amber-400">Empathy Coaching</p>
+            <p className="text-sm text-amber-300/80">{currentNode.empathyGuidance}</p>
           </CardContent>
         </Card>
 
@@ -223,7 +223,7 @@ export function TestMode() {
               key={opt.id}
               variant="outline"
               className={`h-auto py-3 px-4 text-left justify-start whitespace-normal ${
-                expected?.answerId === opt.id ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+                expected?.answerId === opt.id ? 'ring-2 ring-blue-500/60 bg-blue-500/5' : ''
               }`}
               onClick={() => handleAnswer(opt.id)}
             >
@@ -244,8 +244,8 @@ export function TestMode() {
             <CardHeader className="pb-2"><CardTitle className="text-sm">Test Log</CardTitle></CardHeader>
             <CardContent>
               {testLog.map((entry, i) => (
-                <div key={i} className={`text-xs py-1 border-b flex items-center gap-2 ${entry.expected ? '' : 'bg-red-50'}`}>
-                  <span className={`inline-block w-5 h-5 rounded-full text-center leading-5 text-white text-[10px] ${entry.expected ? 'bg-green-500' : 'bg-red-500'}`}>
+                <div key={i} className={`text-xs py-1 border-b flex items-center gap-2 ${entry.expected ? '' : 'bg-red-500/10'}`}>
+                  <span className={`inline-block w-5 h-5 rounded-full text-center leading-5 text-white text-[10px] ${entry.expected ? 'bg-green-500' : 'bg-red-500/100'}`}>
                     {entry.expected ? '✓' : '✗'}
                   </span>
                   <span className="font-medium">{entry.node}</span>
@@ -294,8 +294,8 @@ export function TestMode() {
           <CardHeader className="pb-2"><CardTitle className="text-sm">Step-by-Step Results</CardTitle></CardHeader>
           <CardContent className="space-y-1">
             {testLog.map((entry, i) => (
-              <div key={i} className={`flex items-center gap-3 text-sm py-1.5 border-b ${entry.expected ? '' : 'bg-red-50'}`}>
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-xs ${entry.expected ? 'bg-green-500' : 'bg-red-500'}`}>
+              <div key={i} className={`flex items-center gap-3 text-sm py-1.5 border-b ${entry.expected ? '' : 'bg-red-500/10'}`}>
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-xs ${entry.expected ? 'bg-green-500' : 'bg-red-500/100'}`}>
                   {entry.expected ? '✓' : '✗'}
                 </span>
                 <span className="font-medium w-48">{entry.node}</span>

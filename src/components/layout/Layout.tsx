@@ -6,7 +6,7 @@ import { useQueue } from '@/lib/QueueContext'
 const navItems = [
   { label: 'Caseload', path: '/' },
   { label: 'Dashboard', path: '/manager' },
-  { label: 'Test Mode', path: '/test' },
+  { label: 'Demo Mode', path: '/test' },
   { label: 'Flow Builder', path: '/builder' },
 ]
 

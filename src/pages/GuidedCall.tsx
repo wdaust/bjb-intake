@@ -183,15 +183,20 @@ export function GuidedCall() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-2">
-              {currentNode.answerOptions.map((opt) => (
+              {currentNode.answerOptions.map((opt, idx) => (
                 <Button
                   key={opt.id}
                   variant="outline"
-                  className="h-auto py-3 px-4 text-left justify-start whitespace-normal"
+                  className={`h-auto py-3 px-4 text-left justify-start whitespace-normal ${
+                    idx === 0 ? 'ring-2 ring-blue-500/60 bg-blue-500/5 col-start-1 row-start-1' : ''
+                  }`}
                   onClick={() => handleAnswer(opt.id)}
                 >
                   <div>
-                    <p className="font-medium text-sm">{opt.label}</p>
+                    <p className="font-medium text-sm">
+                      {opt.label}
+                      {idx === 0 && <span className="ml-1.5 text-[10px] text-blue-400 font-normal">(expected)</span>}
+                    </p>
                     {opt.description && (
                       <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
                     )}
