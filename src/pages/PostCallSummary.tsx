@@ -103,9 +103,24 @@ export function PostCallSummary() {
   const navigate = useNavigate()
   const location = useLocation()
   const [cv, setCv] = useState<FullCaseView | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getCaseByIdLive(caseId || '').then(data => setCv(data || null))
+    if (!caseId) {
+      setCv(null)
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    getCaseByIdLive(caseId).then((data) => {
+      if (cancelled) return
+      setCv(data || null)
+      setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [caseId])
 
   const state = (location.state || {}) as {
@@ -118,16 +133,29 @@ export function PostCallSummary() {
   const tasks = state.tasks || []
   const direction = state.direction || 'unresolved'
 
-  const [note, setNote] = useState(() =>
-    generateNoteText(
-      cv?.client.fullName || 'Client',
-      capturedData,
-      direction,
-      tasks
-    )
-  )
+  // Regenerate the note from scratch whenever the case data arrives
+  // (or caseId changes, since that triggers a new fetch). Previously the
+  // note was frozen at `useState(() => generateNoteText('Client', ...))`
+  // and never updated when `cv` populated, leaving the real client name
+  // missing from every saved note.
+  // `userEdited` tracks whether the operator has manually changed the
+  // note — if so, we don't overwrite their edits on subsequent renders.
+  const [note, setNote] = useState('')
+  const [userEdited, setUserEdited] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  useEffect(() => {
+    if (!cv || userEdited) return
+    setNote(generateNoteText(cv.client.fullName, capturedData, direction, tasks))
+    // capturedData/tasks/direction come from location.state and are
+    // stable for the life of this page, so they're safe to omit from
+    // the dep list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cv, userEdited])
+
+  if (loading) {
+    return <p className="text-muted-foreground">Loading case...</p>
+  }
   if (!cv) {
     return <p className="text-muted-foreground">Case not found.</p>
   }
@@ -249,7 +277,10 @@ export function PostCallSummary() {
         <CardContent className="space-y-3">
           <Textarea
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) => {
+              setNote(e.target.value)
+              setUserEdited(true)
+            }}
             rows={12}
             className="text-sm font-mono"
           />

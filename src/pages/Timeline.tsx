@@ -46,14 +46,25 @@ export function Timeline() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      getCaseByIdLive(caseId || ''),
-      getTimelineLive(caseId || ''),
-    ]).then(([caseData, timeline]) => {
-      setCv(caseData || null)
-      setEvents(timeline)
+    if (!caseId) {
+      setCv(null)
+      setEvents([])
       setLoading(false)
-    })
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    Promise.all([getCaseByIdLive(caseId), getTimelineLive(caseId)]).then(
+      ([caseData, timeline]) => {
+        if (cancelled) return
+        setCv(caseData || null)
+        setEvents(timeline)
+        setLoading(false)
+      }
+    )
+    return () => {
+      cancelled = true
+    }
   }, [caseId])
 
   if (loading) return <p className="text-muted-foreground">Loading timeline...</p>

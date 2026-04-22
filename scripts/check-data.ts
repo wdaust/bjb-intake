@@ -12,7 +12,15 @@ async function main() {
            c.first_name, c.last_name, c.phone, c.email, c.mailing_state, c.birthdate,
            atty.name as attorney_name
     FROM sf_matters m
-    LEFT JOIN sf_contacts c ON m.client_id = c.sf_id
+    -- sf_matters.client_id is a Salesforce Account ID (001...), not a Contact ID.
+    -- Contacts are joined via their AccountId. One Account can have multiple
+    -- Contacts; for a diagnostic dump we just pick one per account via DISTINCT ON.
+    LEFT JOIN LATERAL (
+      SELECT * FROM sf_contacts c2
+      WHERE c2.account_id = m.client_id
+      ORDER BY c2.synced_at DESC NULLS LAST
+      LIMIT 1
+    ) c ON true
     LEFT JOIN sf_users atty ON m.principal_attorney_id = atty.sf_id
     WHERE m.status NOT IN ('Closed', 'Resolved')
     ORDER BY m.open_date DESC

@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// Deny-all default. This app does NOT use Firestore — its data layer is
+// Neon (via Firebase Callable Functions). These rules exist so that if
+// Firestore is ever enabled on the project, no data leaks by default.
+//
+// When a real collection is added:
+//   1. Add a specific `match /collection/{id}` block with the auth rules
+//      that collection needs.
+//   2. Keep the catch-all below as the last match so anything untyped
+//      stays denied.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

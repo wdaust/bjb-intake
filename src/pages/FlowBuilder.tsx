@@ -49,8 +49,8 @@ function buildFlowFromNodes(callNodes: CallNode[]): { nodes: Node[]; edges: Edge
   // Group by stage for x positioning
   const stageGroups: Record<string, CallNode[]> = {}
   for (const cn of callNodes) {
-    if (!stageGroups[cn.stage]) stageGroups[cn.stage] = []
-    stageGroups[cn.stage].push(cn)
+    const group = stageGroups[cn.stage] ?? (stageGroups[cn.stage] = [])
+    group.push(cn)
   }
 
   for (const cn of callNodes) {
@@ -365,8 +365,9 @@ export function FlowBuilder() {
                   <Input
                     value={opt.id}
                     onChange={(e) => {
-                      const updated = [...editingNode.answerOptions]
-                      updated[i] = { ...updated[i], id: e.target.value }
+                      const updated = editingNode.answerOptions.map((o, idx) =>
+                        idx === i ? { ...o, id: e.target.value } : o
+                      )
                       setEditingNode({ ...editingNode, answerOptions: updated })
                     }}
                     className="text-xs flex-1"
@@ -375,8 +376,9 @@ export function FlowBuilder() {
                   <Input
                     value={opt.label}
                     onChange={(e) => {
-                      const updated = [...editingNode.answerOptions]
-                      updated[i] = { ...updated[i], label: e.target.value }
+                      const updated = editingNode.answerOptions.map((o, idx) =>
+                        idx === i ? { ...o, label: e.target.value } : o
+                      )
                       setEditingNode({ ...editingNode, answerOptions: updated })
                     }}
                     className="text-xs flex-[2]"
