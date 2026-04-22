@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
-import { getAllCasesLive, getCaseManagers, searchCases, getCmStats, type CmStats } from '@/data/liveData'
+import { getAllCasesLive, getCaseManagers, searchCases, getCmStats, type CmStats, type ServerSortKey } from '@/data/liveData'
 import { useQueue, DEFAULT_CM_ID, DEFAULT_CM_NAME } from '@/lib/QueueContext'
 import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView, SortCriteria } from '@/types'
@@ -143,14 +143,26 @@ export function Caseload() {
     getCmStats(selectedCm || undefined).then(setCmStats)
   }, [selectedCm])
 
-  // Load cases when CM selection or page changes. Cancellation-aware:
-  // if the user flips CM or pages quickly, stale responses are dropped
-  // rather than overwriting the newer selection.
+  // Map the current client-side sort selection onto the server-side
+  // sort keys that are DB-derivable. Score-based sorts (urgency, demand
+  // trajectory, etc.) still sort the returned page locally below;
+  // server-side sort only wins for criteria that map cleanly to SQL
+  // columns. Without this, Page 1 would always return the newest 50
+  // matters and the UI sort would just reshuffle that small slice —
+  // masking whichever longest-gap / most-urgent cases live deeper in
+  // the result set.
+  const serverSort: ServerSortKey =
+    sortBy === 'treatment_gap' || sortBy === 'statute_urgency' || sortBy === 'no_contact'
+      ? sortBy
+      : 'open_date_desc'
+
+  // Load cases when CM selection, page, or sort changes. Cancellation-
+  // aware: if the user flips quickly, stale responses are dropped.
   useEffect(() => {
     if (search.length >= 2) return // search effect owns this state window
     let cancelled = false
     setLoading(true)
-    getAllCasesLive(selectedCm || undefined, page).then((result) => {
+    getAllCasesLive(selectedCm || undefined, page, serverSort).then((result) => {
       if (cancelled) return
       setAllCases(result.cases)
       setTotalCount(result.totalCount)
@@ -161,7 +173,7 @@ export function Caseload() {
     return () => {
       cancelled = true
     }
-  }, [selectedCm, page, search, setQueue])
+  }, [selectedCm, page, search, serverSort, setQueue])
 
   // Server-side search with debounce. Cancellation-aware + resets back
   // to the paginated list when the query is cleared to < 2 chars.
@@ -211,8 +223,16 @@ export function Caseload() {
         break
     }
 
+    // When the server already sorted (treatment_gap, statute_urgency,
+    // no_contact), trust its order and skip the client-side sort.
+    // Otherwise the client comparator fights the server:
+    //   - Server puts NULL-data cases last (NULLS LAST)
+    //   - Client's `treatmentGapDays` uses the sentinel 999 for NULL
+    //     data, which makes `b.gap - a.gap` float NULL cases to the top
+    // Score-based sorts that the server can't express still run locally.
+    if (serverSort !== 'open_date_desc') return cases
     return sortCases(cases, sortBy)
-  }, [allCases, search, sortBy, filterPreset])
+  }, [allCases, search, sortBy, filterPreset, serverSort])
 
   function getInitials(name: string): string {
     return name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase()
