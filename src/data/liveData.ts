@@ -51,7 +51,7 @@ type CaseBundle = {
 interface CaseManagerRow {
   sf_id: string
   name: string
-  role_name: string
+  roles: string | null
   case_count: number | string
 }
 
@@ -318,14 +318,14 @@ function mapMatterToCase(
 // ============================================================
 
 export async function getCaseManagers(): Promise<
-  { id: string; name: string; role: string; caseCount: number }[]
+  { id: string; name: string; roles: string; caseCount: number }[]
 > {
   try {
     const { rows } = await fnListCaseManagers({})
     return rows.map((r) => ({
       id: r.sf_id,
       name: r.name,
-      role: r.role_name,
+      roles: r.roles || '',
       caseCount: Number(r.case_count),
     }))
   } catch {

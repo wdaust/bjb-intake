@@ -32,8 +32,18 @@ const runWith = { secrets: [DATABASE_URL] }
 
 export const listCaseManagers = onCall(runWith, async (request) => {
   requireAuth(request)
+  // One row per CM (not per role). Previously we grouped by (user_id,
+  // role_name) so a CM with multiple roles appeared multiple times, each
+  // showing a subset of their cases. But the actual `listCases` filter
+  // uses user_id only, so picking any row returned ALL of that CM's
+  // matters — producing the confusing "5 cases in dropdown, 375 on
+  // screen" discrepancy.
+  //
+  // Now we aggregate roles into a comma-separated string and return a
+  // `case_count` that matches what `listCases(cmUserId)` will return.
   const rows = await sql()`
-    SELECT u.sf_id, u.name, tm.role_name,
+    SELECT u.sf_id, u.name,
+           STRING_AGG(DISTINCT tm.role_name, ', ' ORDER BY tm.role_name) as roles,
            COUNT(DISTINCT tm.matter_id) as case_count
     FROM sf_team_members tm
     JOIN sf_users u ON tm.user_id = u.sf_id
@@ -46,7 +56,7 @@ export const listCaseManagers = onCall(runWith, async (request) => {
         OR tm.role_name ILIKE '%medical%'
         OR tm.role_name ILIKE '%attorney%'
       )
-    GROUP BY u.sf_id, u.name, tm.role_name
+    GROUP BY u.sf_id, u.name
     ORDER BY u.name
   `
   return { rows }
