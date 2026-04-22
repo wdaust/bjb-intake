@@ -143,31 +143,49 @@ export function Caseload() {
     getCmStats(selectedCm || undefined).then(setCmStats)
   }, [selectedCm])
 
-  // Load cases when CM selection or page changes
+  // Load cases when CM selection or page changes. Cancellation-aware:
+  // if the user flips CM or pages quickly, stale responses are dropped
+  // rather than overwriting the newer selection.
   useEffect(() => {
-    if (search.length >= 2) return // search handles its own loading
+    if (search.length >= 2) return // search effect owns this state window
+    let cancelled = false
     setLoading(true)
-    getAllCasesLive(selectedCm || undefined, page).then(result => {
+    getAllCasesLive(selectedCm || undefined, page).then((result) => {
+      if (cancelled) return
       setAllCases(result.cases)
       setTotalCount(result.totalCount)
       setPageSize(result.pageSize)
       setQueue(result.cases) // populate queue for sidebar navigation
       setLoading(false)
     })
+    return () => {
+      cancelled = true
+    }
   }, [selectedCm, page, search, setQueue])
 
-  // Server-side search with debounce
+  // Server-side search with debounce. Cancellation-aware + resets back
+  // to the paginated list when the query is cleared to < 2 chars.
   useEffect(() => {
-    if (search.length < 2) return
+    if (search.length < 2) {
+      // When the user shortens/clears the query, drop any lingering
+      // search results so the effect above repopulates paginated data.
+      setAllCases([])
+      return
+    }
+    let cancelled = false
     setLoading(true)
     const timer = setTimeout(() => {
-      searchCases(search).then(results => {
+      searchCases(search).then((results) => {
+        if (cancelled) return
         setAllCases(results)
         setTotalCount(results.length)
         setLoading(false)
       })
     }, 400)
-    return () => clearTimeout(timer)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [search])
 
   const totalPages = Math.ceil(totalCount / pageSize)
@@ -202,7 +220,7 @@ export function Caseload() {
   function getInitialColor(name: string): string {
     const colors = ['bg-blue-500','bg-purple-500','bg-teal-500','bg-pink-500','bg-orange-500','bg-cyan-500','bg-indigo-500','bg-emerald-500','bg-rose-500','bg-amber-500']
     let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-    return colors[Math.abs(hash) % colors.length]
+    return colors[Math.abs(hash) % colors.length] ?? colors[0]!
   }
 
   return (

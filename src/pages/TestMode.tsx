@@ -90,6 +90,7 @@ export function TestMode() {
 
     for (let i = 0; i < s.expectedAnswers.length; i++) {
       const expected = s.expectedAnswers[i]
+      if (!expected) break
       if (node.nodeId !== expected.nodeId) {
         log.push({ step: i + 1, node: node.nodeName, answer: `MISMATCH — expected node ${expected.nodeId}, at ${node.nodeId}`, expected: false, note: 'Node path diverged' })
         break

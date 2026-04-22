@@ -34,19 +34,19 @@ export function QueueProvider({ children }: { children: ReactNode }) {
   const prevCase = currentIndex > 0 ? queue[currentIndex - 1] : undefined
 
   function goNext(): string | null {
-    if (currentIndex < queue.length - 1) {
-      const next = currentIndex + 1
-      setCurrentIndex(next)
-      return queue[next].caseData.id
+    const nextCase = queue[currentIndex + 1]
+    if (nextCase) {
+      setCurrentIndex(currentIndex + 1)
+      return nextCase.caseData.id
     }
     return null
   }
 
   function goPrev(): string | null {
-    if (currentIndex > 0) {
-      const prev = currentIndex - 1
-      setCurrentIndex(prev)
-      return queue[prev].caseData.id
+    const prevCase = currentIndex > 0 ? queue[currentIndex - 1] : undefined
+    if (prevCase) {
+      setCurrentIndex(currentIndex - 1)
+      return prevCase.caseData.id
     }
     return null
   }

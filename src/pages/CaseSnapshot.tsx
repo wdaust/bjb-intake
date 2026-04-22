@@ -171,13 +171,33 @@ export function CaseSnapshot() {
   const [loading, setLoading] = useState(true)
   const { queue, setCurrentIndex } = useQueue()
 
+  // Fetch case — cancellation-aware. Re-runs only when caseId changes,
+  // not when the queue is refreshed elsewhere (the old combined effect
+  // re-fetched on every Caseload refresh and could race: a stale
+  // response from the previous caseId could clobber the newer one).
   useEffect(() => {
-    getCaseByIdLive(caseId || '').then(data => {
+    if (!caseId) {
+      setCv(null)
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    getCaseByIdLive(caseId).then((data) => {
+      if (cancelled) return
       setCv(data || null)
       setLoading(false)
     })
-    // Set queue index
-    const idx = queue.findIndex(c => c.caseData.id === caseId)
+    return () => {
+      cancelled = true
+    }
+  }, [caseId])
+
+  // Sync the sidebar queue cursor to this case. Cheap, independent of
+  // data fetch.
+  useEffect(() => {
+    if (!caseId) return
+    const idx = queue.findIndex((c) => c.caseData.id === caseId)
     if (idx >= 0) setCurrentIndex(idx)
   }, [caseId, queue, setCurrentIndex])
 

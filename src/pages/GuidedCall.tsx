@@ -31,7 +31,17 @@ export function GuidedCall() {
   const [cv, setCv] = useState<FullCaseView | null>(null)
 
   useEffect(() => {
-    getCaseByIdLive(caseId || '').then(data => setCv(data || null))
+    if (!caseId) {
+      setCv(null)
+      return
+    }
+    let cancelled = false
+    getCaseByIdLive(caseId).then((data) => {
+      if (!cancelled) setCv(data || null)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [caseId])
 
   const [currentNode, setCurrentNode] = useState<CallNode>(getStartNode())
@@ -87,8 +97,8 @@ export function GuidedCall() {
   }, [currentNode, capturedData, directionWeights])
 
   function handleBack() {
-    if (history.length === 0) return
     const prev = history[history.length - 1]
+    if (!prev) return
     setHistory((h) => h.slice(0, -1))
     const prevNode = getNode(prev.nodeId)
     if (prevNode) setCurrentNode(prevNode)
@@ -122,9 +132,10 @@ export function GuidedCall() {
   const currentStageIndex = STAGE_ORDER.indexOf(currentNode.stage)
 
   // Interpolate client name into prompt
+  const firstName = cv.client.preferredName || cv.client.fullName.split(' ')[0] || cv.client.fullName
   const promptText = currentNode.promptText
-    .replace('[Client Name]', cv.client.preferredName || cv.client.fullName.split(' ')[0])
-    .replace('[Client First Name]', cv.client.preferredName || cv.client.fullName.split(' ')[0])
+    .replace('[Client Name]', firstName)
+    .replace('[Client First Name]', firstName)
     .replace('[CM Name]', cv.caseData.caseManagerAssigned)
     .replace('[Firm]', 'Brandon J. Broderick')
     .replace('[Firm/Firm Team]', 'Brandon J. Broderick')

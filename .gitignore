@@ -29,3 +29,7 @@ dist-ssr
 
 # Firebase
 .firebase/
+
+# Claude Code — keep team-shared commands, ignore per-user settings
+.claude/settings.local.json
+.claude/worktrees/
