@@ -66,16 +66,28 @@ export const listCaseManagers = onCall(runWith, async (request) => {
 // Cases — paginated list
 // --------------------------------------------------------------------
 
+// Server-side sort keys that are DB-derivable. Anything not in this
+// set falls back to 'open_date_desc' (newest first). Client-side score-
+// based sorts (urgency, demand trajectory, etc.) continue to sort the
+// returned page locally in Caseload.tsx.
+const SERVER_SORT_KEYS = [
+  'treatment_gap',     // longest gap since last service_end_date first
+  'statute_urgency',   // soonest SOL first
+  'no_contact',        // longest gap since last closed task first
+  'open_date_desc',    // default — newest matter first
+] as const
+
 const listCasesInput = z.object({
   cmUserId: z.string().max(64).optional(),
   page: z.number().int().min(0).max(1000).default(0),
+  sortBy: z.enum(SERVER_SORT_KEYS).default('open_date_desc'),
 })
 
 const PAGE_SIZE = 50
 
 export const listCases = onCall(runWith, async (request) => {
   requireAuth(request)
-  const { cmUserId, page } = listCasesInput.parse(request.data ?? {})
+  const { cmUserId, page, sortBy } = listCasesInput.parse(request.data ?? {})
   const offset = page * PAGE_SIZE
   const s = sql()
 
@@ -92,6 +104,14 @@ export const listCases = onCall(runWith, async (request) => {
         WHERE status NOT IN ('Closed', 'Resolved') AND pi_status IS NOT NULL
       `
 
+  // Unified sort-key column. Every sort reduces to an ASC-ordered epoch
+  // value so we can use one ORDER BY clause for all of them:
+  //   - treatment_gap:   oldest last-service first (longest gap surfaced)
+  //   - statute_urgency: soonest SOL first
+  //   - no_contact:      oldest last-closed-task first
+  //   - open_date_desc:  negative epoch so ASC ordering = newest first
+  // NULLS LAST pushes rows missing the relevant date to the end (cases
+  // with no treatment/contact data don't get misrepresented as "999d gap").
   const matters = cmUserId
     ? await s`
         SELECT
@@ -104,7 +124,16 @@ export const listCases = onCall(runWith, async (request) => {
           c.phone as client_phone, c.email as client_email,
           c.mailing_state as client_state, c.birthdate as client_dob,
           c.mailing_street, c.mailing_city,
-          atty.name as attorney_name
+          atty.name as attorney_name,
+          CASE ${sortBy}
+            WHEN 'treatment_gap' THEN EXTRACT(EPOCH FROM
+              (SELECT MAX(service_end_date) FROM sf_damages d WHERE d.matter_id = m.sf_id))
+            WHEN 'statute_urgency' THEN EXTRACT(EPOCH FROM m.statute_of_limitations::timestamptz)
+            WHEN 'no_contact' THEN EXTRACT(EPOCH FROM
+              (SELECT MAX(COALESCE(t.completed_date, t.activity_date::timestamptz))
+               FROM sf_tasks t WHERE t.matter_id = m.sf_id AND t.is_closed = true))
+            ELSE -EXTRACT(EPOCH FROM m.open_date::timestamptz)
+          END AS sort_key
         FROM sf_matters m
         -- sf_matters.client_id is a Salesforce Account ID (001-prefix),
         -- NOT a Contact ID. An Account can own multiple Contacts, so a
@@ -121,7 +150,7 @@ export const listCases = onCall(runWith, async (request) => {
         INNER JOIN sf_team_members tm ON tm.matter_id = m.sf_id AND tm.user_id = ${cmUserId}
         WHERE m.status NOT IN ('Closed', 'Resolved')
           AND m.pi_status IS NOT NULL
-        ORDER BY m.open_date DESC NULLS LAST
+        ORDER BY sort_key ASC NULLS LAST, m.open_date DESC NULLS LAST
         LIMIT ${PAGE_SIZE} OFFSET ${offset}
       `
     : await s`
@@ -135,7 +164,16 @@ export const listCases = onCall(runWith, async (request) => {
           c.phone as client_phone, c.email as client_email,
           c.mailing_state as client_state, c.birthdate as client_dob,
           c.mailing_street, c.mailing_city,
-          atty.name as attorney_name
+          atty.name as attorney_name,
+          CASE ${sortBy}
+            WHEN 'treatment_gap' THEN EXTRACT(EPOCH FROM
+              (SELECT MAX(service_end_date) FROM sf_damages d WHERE d.matter_id = m.sf_id))
+            WHEN 'statute_urgency' THEN EXTRACT(EPOCH FROM m.statute_of_limitations::timestamptz)
+            WHEN 'no_contact' THEN EXTRACT(EPOCH FROM
+              (SELECT MAX(COALESCE(t.completed_date, t.activity_date::timestamptz))
+               FROM sf_tasks t WHERE t.matter_id = m.sf_id AND t.is_closed = true))
+            ELSE -EXTRACT(EPOCH FROM m.open_date::timestamptz)
+          END AS sort_key
         FROM sf_matters m
         -- sf_matters.client_id is a Salesforce Account ID (001-prefix),
         -- NOT a Contact ID. An Account can own multiple Contacts, so a
@@ -151,7 +189,7 @@ export const listCases = onCall(runWith, async (request) => {
         LEFT JOIN sf_users atty ON m.principal_attorney_id = atty.sf_id
         WHERE m.status NOT IN ('Closed', 'Resolved')
           AND m.pi_status IS NOT NULL
-        ORDER BY m.open_date DESC NULLS LAST
+        ORDER BY sort_key ASC NULLS LAST, m.open_date DESC NULLS LAST
         LIMIT ${PAGE_SIZE} OFFSET ${offset}
       `
 

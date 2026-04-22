@@ -63,7 +63,16 @@ interface StagnationRow {
 }
 
 const fnListCaseManagers = callable<Record<string, never>, { rows: CaseManagerRow[] }>('listCaseManagers')
-const fnListCases = callable<{ cmUserId?: string; page?: number }, CaseBundle>('listCases')
+export type ServerSortKey =
+  | 'treatment_gap'
+  | 'statute_urgency'
+  | 'no_contact'
+  | 'open_date_desc'
+
+const fnListCases = callable<
+  { cmUserId?: string; page?: number; sortBy?: ServerSortKey },
+  CaseBundle
+>('listCases')
 const fnGetCase = callable<
   { caseId: string },
   {
@@ -337,15 +346,18 @@ const PAGE_SIZE = 50
 
 export async function getAllCasesLive(
   cmUserId?: string,
-  page = 0
+  page = 0,
+  sortBy: ServerSortKey = 'open_date_desc'
 ): Promise<{ cases: FullCaseView[]; totalCount: number; pageSize: number }> {
-  const cacheKey = `${cmUserId || '__all__'}_p${page}`
+  // sortBy is part of the cache key so flipping sort always hits the
+  // server — otherwise we'd show a stale page ordered the old way.
+  const cacheKey = `${cmUserId || '__all__'}_p${page}_s${sortBy}`
   const cached = caseCache[cacheKey]
   if (cached && Date.now() - cached.time < CACHE_TTL) {
     return { cases: cached.cases, totalCount: cached.totalCount, pageSize: PAGE_SIZE }
   }
   try {
-    const bundle = await fnListCases({ cmUserId, page })
+    const bundle = await fnListCases({ cmUserId, page, sortBy })
     if (bundle.matters.length === 0 && page === 0) {
       const mock = getMockCases()
       return { cases: mock, totalCount: mock.length, pageSize: PAGE_SIZE }
