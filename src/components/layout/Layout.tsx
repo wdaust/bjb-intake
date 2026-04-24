@@ -7,6 +7,7 @@ import {
   BarChart3,
   Workflow,
   ChevronRight,
+  ListChecks,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -60,24 +61,35 @@ interface NavItem {
   matchPrefixes?: string[]
 }
 
-const NAV_ITEMS: NavItem[] = [
-  // Today is the root route ("/"), so it matches both "/" and "/today".
-  { label: 'Today', path: '/today', icon: Home, matchPrefixes: ['/today'] },
-  { label: 'Intake', path: '/intake', icon: Inbox, badge: 3, matchPrefixes: ['/intake'] },
-  {
-    label: 'Caseload',
-    path: '/caseload',
-    icon: Briefcase,
-    matchPrefixes: ['/caseload', '/case/', '/call/', '/timeline/', '/summary/', '/case-demo/'],
-  },
-  { label: 'Manager', path: '/manager', icon: BarChart3, matchPrefixes: ['/manager'] },
-  { label: 'Flow Builder', path: '/builder', icon: Workflow, matchPrefixes: ['/builder'] },
-]
+function buildNavItems(queueBadge: number): NavItem[] {
+  return [
+    // Today is the root route ("/"), so it matches both "/" and "/today".
+    { label: 'Today', path: '/today', icon: Home, matchPrefixes: ['/today'] },
+    { label: 'Intake', path: '/intake', icon: Inbox, badge: 3, matchPrefixes: ['/intake'] },
+    {
+      label: 'Queue',
+      path: '/queue',
+      icon: ListChecks,
+      badge: queueBadge,
+      matchPrefixes: ['/queue'],
+    },
+    {
+      label: 'Caseload',
+      path: '/caseload',
+      icon: Briefcase,
+      matchPrefixes: ['/caseload', '/case/', '/call/', '/timeline/', '/summary/', '/case-demo/'],
+    },
+    { label: 'Manager', path: '/manager', icon: BarChart3, matchPrefixes: ['/manager'] },
+    { label: 'Flow Builder', path: '/builder', icon: Workflow, matchPrefixes: ['/builder'] },
+  ]
+}
 
 /** Pretty labels for common path segments. */
 const SEGMENT_LABELS: Record<string, string> = {
   today: 'Today',
   intake: 'Intake',
+  queue: 'Queue',
+  run: 'Running',
   case: 'Case',
   call: 'Call',
   timeline: 'Timeline',
@@ -147,6 +159,43 @@ function isNavActive(item: NavItem, pathname: string): boolean {
   return false
 }
 
+/**
+ * Count of queued, non-snoozed cases in localStorage for this user. The queue
+ * builder persists the ordered case ids under `caos:queue:<userId>:order` and
+ * any snooze records under `caos:queue:<userId>:snoozed`. Missing storage
+ * defaults to 12 (matches the demo queue fixture size).
+ */
+function readQueueBadgeCount(userId: string): number {
+  if (typeof window === 'undefined') return 12
+  try {
+    const orderRaw = window.localStorage.getItem(`caos:queue:${userId}:order`)
+    if (!orderRaw) return 12
+    const parsed = JSON.parse(orderRaw)
+    if (!Array.isArray(parsed)) return 12
+    const ids = parsed.filter((v): v is string => typeof v === 'string')
+    const snoozedRaw = window.localStorage.getItem(`caos:queue:${userId}:snoozed`)
+    if (snoozedRaw) {
+      try {
+        const snoozedObj = JSON.parse(snoozedRaw) as Record<string, unknown>
+        if (snoozedObj && typeof snoozedObj === 'object') {
+          const now = Date.now()
+          const snoozedIds = new Set<string>()
+          for (const [id, until] of Object.entries(snoozedObj)) {
+            const untilMs = typeof until === 'number' ? until : Number(until)
+            if (Number.isFinite(untilMs) && untilMs > now) snoozedIds.add(id)
+          }
+          return ids.filter((id) => !snoozedIds.has(id)).length
+        }
+      } catch {
+        /* ignore malformed snooze payload */
+      }
+    }
+    return ids.length
+  } catch {
+    return 12
+  }
+}
+
 /** Collapse sidebar below this viewport width. */
 const COLLAPSE_BREAKPOINT_PX = 1280
 
@@ -203,6 +252,15 @@ export function Layout() {
   }, [])
 
   const breadcrumbs = useMemo(() => buildBreadcrumbs(location.pathname), [location.pathname])
+
+  const queueUserId = user?.uid || 'default'
+  const navItems = useMemo(
+    () => buildNavItems(readQueueBadgeCount(queueUserId)),
+    // Re-read on every route change so adding/removing a case from another
+    // page updates the sidebar badge without a full reload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queueUserId, location.pathname],
+  )
 
   const displayName = cmName || user?.displayName || user?.email?.split('@')[0] || 'User'
   const roleLabel = 'Case Manager'
@@ -261,7 +319,7 @@ export function Layout() {
         <SidebarContent>
           <SidebarGroup className="px-2 py-1">
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const active = isNavActive(item, location.pathname)
                 const Icon = item.icon
                 return (

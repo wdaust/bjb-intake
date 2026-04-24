@@ -14,8 +14,10 @@ import {
   CheckCircle2,
   User,
   ChevronDown,
+  ListPlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/lib/AuthContext'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
@@ -416,6 +418,49 @@ function LeftRail({
   const tStyle = tierStyle(lead.valueTier)
   const vStyle = verdictStyle(lead.verdict)
 
+  const { user } = useAuth()
+  const queueUserId = user?.uid || 'default'
+  const initialQueued = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      const raw = window.localStorage.getItem(`caos:queue:${queueUserId}:order`)
+      if (!raw) return false
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) && parsed.includes(lead.id)
+    } catch {
+      return false
+    }
+  }, [queueUserId, lead.id])
+  const [queued, setQueued] = useState(initialQueued)
+  const [justAdded, setJustAdded] = useState(false)
+
+  function handleAddToQueue() {
+    if (queued) return
+    try {
+      const key = `caos:queue:${queueUserId}:order`
+      const raw = window.localStorage.getItem(key)
+      const existing: string[] = raw
+        ? (() => {
+            try {
+              const parsed = JSON.parse(raw)
+              return Array.isArray(parsed)
+                ? parsed.filter((v): v is string => typeof v === 'string')
+                : []
+            } catch {
+              return []
+            }
+          })()
+        : []
+      const next = [lead.id, ...existing.filter((id) => id !== lead.id)]
+      window.localStorage.setItem(key, JSON.stringify(next))
+      setQueued(true)
+      setJustAdded(true)
+      window.setTimeout(() => setJustAdded(false), 1400)
+    } catch {
+      /* ignore */
+    }
+  }
+
   const events = useMemo<TimelineEvent[]>(() => {
     const out: TimelineEvent[] = [
       {
@@ -588,6 +633,19 @@ function LeftRail({
         <ActionBtn icon={<XCircle className="h-3.5 w-3.5" />}>
           Mark rejected
         </ActionBtn>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleAddToQueue}
+          disabled={queued}
+          className={cn(
+            'h-8 w-full justify-start gap-2 rounded-md border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-medium text-[var(--foreground)] hover:bg-[var(--ring)]/10',
+            justAdded && 'animate-pulse',
+          )}
+        >
+          <ListPlus className="h-3.5 w-3.5" />
+          {queued ? (justAdded ? 'Added' : 'Queued') : 'Add to queue'}
+        </Button>
       </div>
 
       {/* Case timeline */}

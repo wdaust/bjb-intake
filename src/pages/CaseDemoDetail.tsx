@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -6,10 +6,13 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ListPlus,
   Pause,
   TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/lib/AuthContext'
 import { CallPlayer } from '@/components/case/CallPlayer'
 import type { CallPlayerSegment } from '@/components/case/CallPlayer'
 import type { CallScores } from '@/components/intake/CallScoreCard'
@@ -390,8 +393,52 @@ function tierClasses(score: number): {
 
 export default function CaseDemoDetail() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [scored, setScored] = useState(false)
   const [audioPlaying, setAudioPlaying] = useState(false)
+  // Case id is hard-coded for the demo fixture (the route is /case-demo/INT-...).
+  const demoCaseId = 'MAT-26042500001'
+  const queueUserId = user?.uid || 'default'
+  const initialQueued = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      const raw = window.localStorage.getItem(`caos:queue:${queueUserId}:order`)
+      if (!raw) return false
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) && parsed.includes(demoCaseId)
+    } catch {
+      return false
+    }
+  }, [queueUserId])
+  const [queued, setQueued] = useState(initialQueued)
+  const [justAdded, setJustAdded] = useState(false)
+
+  function handleAddToQueue() {
+    if (queued) return
+    try {
+      const key = `caos:queue:${queueUserId}:order`
+      const raw = window.localStorage.getItem(key)
+      const existing: string[] = raw
+        ? (() => {
+            try {
+              const parsed = JSON.parse(raw)
+              return Array.isArray(parsed)
+                ? parsed.filter((v): v is string => typeof v === 'string')
+                : []
+            } catch {
+              return []
+            }
+          })()
+        : []
+      const next = [demoCaseId, ...existing.filter((id) => id !== demoCaseId)]
+      window.localStorage.setItem(key, JSON.stringify(next))
+      setQueued(true)
+      setJustAdded(true)
+      window.setTimeout(() => setJustAdded(false), 1400)
+    } catch {
+      /* swallow — localStorage may be disabled */
+    }
+  }
 
   const currentCall = CALLS_SORTED[0]
   if (!currentCall) return null
@@ -453,6 +500,19 @@ export default function CaseDemoDetail() {
               <StatChip label="Days in pre-lit" value="1" />
               <StatChip label="Treatment events" value="7" />
               <StatChip label="Next action" value="Confirm MRI by tomorrow" wide />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddToQueue}
+                disabled={queued}
+                className={cn(
+                  'h-7 gap-1.5 rounded-md border-border bg-card text-[12px] text-foreground hover:bg-ring/10',
+                  justAdded && 'animate-pulse',
+                )}
+              >
+                <ListPlus className="h-3.5 w-3.5" />
+                {queued ? (justAdded ? 'Added' : 'Queued') : 'Add to queue'}
+              </Button>
               <StatusChip scored={scored} audioPlaying={audioPlaying} />
             </div>
           </div>

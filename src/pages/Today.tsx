@@ -13,7 +13,8 @@
  */
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Clock, Inbox, Briefcase, ArrowRight, Phone, FileText } from 'lucide-react'
+import { Clock, Inbox, Briefcase, ArrowRight, Phone, FileText, Play } from 'lucide-react'
+import { rankCases, RANKER_DEMO_CASES } from '@/lib/callQueueRanker'
 
 // ---------- Mock data for the demo ----------
 
@@ -96,6 +97,13 @@ export default function Today() {
     day: 'numeric',
   })
 
+  // Ranked queue for today's banner. Totals/tier counts come from the shared
+  // ranker so the banner matches the queue builder page exactly.
+  const ranked = useMemo(() => rankCases(RANKER_DEMO_CASES, now), [now])
+  const queueTotal = ranked.length
+  const criticalCount = ranked.filter((c) => c.priorityTier === 'critical').length
+  const highCount = ranked.filter((c) => c.priorityTier === 'high').length
+
   return (
     <div className="mx-auto w-full min-w-0 max-w-[1180px] px-6 py-6">
       {/* Header */}
@@ -110,6 +118,31 @@ export default function Today() {
           Two intro calls booked. Maria Santos is up first at 11:00 — she&rsquo;s your highest-value
           pre-lit case this week.
         </p>
+      </div>
+
+      {/* Today's queue banner — entry point to plow-through mode. */}
+      <div className="mb-5 flex items-center gap-4 rounded-lg border border-border border-l-2 border-l-ring bg-card px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Today&rsquo;s queue
+          </div>
+          <div className="mt-0.5 text-[13px] text-foreground">
+            <span className="font-mono tabular-nums">{queueTotal}</span>{' '}
+            calls planned
+            <span className="mx-1.5 text-muted-foreground">·</span>
+            <span className="font-mono tabular-nums">{criticalCount}</span> critical
+            <span className="mx-1.5 text-muted-foreground">·</span>
+            <span className="font-mono tabular-nums">{highCount}</span> high priority
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/queue/run?start=0')}
+          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-ring/30 bg-ring px-3 text-[12px] font-semibold text-background transition-colors hover:bg-ring/90"
+        >
+          <Play className="h-3.5 w-3.5" />
+          Start today&rsquo;s queue
+        </button>
       </div>
 
       {/* Three-column grid */}
