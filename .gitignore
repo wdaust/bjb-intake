@@ -33,3 +33,7 @@ dist-ssr
 # Claude Code — keep team-shared commands, ignore per-user settings
 .claude/settings.local.json
 .claude/worktrees/
+
+# Demo audio build artifacts (keep final MP3s + scripts, ignore per-line intermediates)
+demo/audio/intake-lines/
+demo/audio/lines/

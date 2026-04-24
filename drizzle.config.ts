@@ -31,5 +31,14 @@ export default defineConfig({
     'sf_stage_activities',
     'sf_intakes',
     'call_flow_nodes',
+    // CAOS-owned (phase 2)
+    'leads',
+    'calls',
+    'call_transcripts',
+    'call_scores',
+    'injuries',
+    'treatment_events',
+    'engagement_agreements',
+    'appointments',
   ],
 })

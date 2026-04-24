@@ -9,6 +9,8 @@ import { PostCallSummary } from './pages/PostCallSummary'
 import { ManagerDashboard } from './pages/ManagerDashboard'
 import { TestMode } from './pages/TestMode'
 import { FlowBuilder } from './pages/FlowBuilder'
+import IntakeQueue from './pages/IntakeQueue'
+import IntakeDetail from './pages/IntakeDetail'
 import { useAuth } from './lib/AuthContext'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -24,6 +26,9 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<Caseload />} />
+        <Route path="/today" element={<Caseload />} />
+        <Route path="/intake" element={<IntakeQueue />} />
+        <Route path="/intake/:leadId" element={<IntakeDetail />} />
         <Route path="/case/:caseId" element={<CaseSnapshot />} />
         <Route path="/call/:caseId" element={<GuidedCall />} />
         <Route path="/timeline/:caseId" element={<Timeline />} />

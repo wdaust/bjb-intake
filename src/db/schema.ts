@@ -366,3 +366,205 @@ export interface CallFlowNodeRow {
   node_data: unknown // typed as CallNode at the app layer
   updated_at: string | null
 }
+
+// ============================================================================
+// CAOS-owned tables (intake + call scoring + treatment progression)
+// ============================================================================
+// These are source-of-truth in Neon, NOT mirrored from Litify.
+// The `leads` table precedes matter creation; on engagement-agreement
+// signature the lead converts to a matter and data cross-links via
+// `leads.converted_matter_id`.
+
+// ---------- Leads (pre-retention intake prospects) ----------
+
+export const leads = pgTable('leads', {
+  id: text('id').primaryKey(),                    // INT-260424...
+  name: text('name').notNull(),
+  phone: text('phone'),
+  email: text('email'),
+  state: text('state').notNull(),                 // 2-letter
+  caseType: text('case_type'),                    // MVA, Slip and Fall, …
+  source: text('source'),                         // phone, web, referral, partner
+  intakeDate: timestamp('intake_date', { withTimezone: true }).defaultNow(),
+  slaDeadline: timestamp('sla_deadline', { withTimezone: true }),
+  status: text('status').notNull().default('new'),
+  // new | contacted | qualifying | agreement_sent | signed | rejected | refer_out
+  verdict: text('verdict'),                       // one of 17 v8 categories
+  valueTier: text('value_tier'),                  // CATASTROPHIC|HIGH|MEDIUM|LOW|MINIMAL
+  opportunityScore: integer('opportunity_score'), // 0-100
+  estValueRange: text('est_value_range'),         // '$40K-$150K'
+  assignedTo: text('assigned_to'),                // intake specialist sf_user_id
+  // Captured intake facts (denormalized for speed — AI-extracted from call)
+  incidentDate: date('incident_date'),
+  incidentState: text('incident_state'),
+  incidentVenue: text('incident_venue'),
+  incidentNarrative: text('incident_narrative'),
+  erVisit: boolean('er_visit'),
+  erFacility: text('er_facility'),
+  policeReport: text('police_report'),
+  witnesses: jsonb('witnesses'),                  // [{name, phone}]
+  defendantDescription: text('defendant_description'),
+  commercialDefendant: boolean('commercial_defendant'),
+  clientInsurance: text('client_insurance'),
+  clientPipBool: boolean('client_pip_bool'),
+  priorRepresentation: boolean('prior_representation'),
+  convertedMatterId: text('converted_matter_id'), // FK sf_matters.sf_id after signing
+  convertedAt: timestamp('converted_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+// ---------- Calls (audio + metadata) ----------
+// Both intake calls and CM follow-up calls live here.
+
+export const calls = pgTable('calls', {
+  id: text('id').primaryKey(),                    // call-<uuid>
+  callType: text('call_type').notNull(),          // 'intake' | 'cm_call'
+  leadId: text('lead_id'),                        // FK leads.id for intake
+  matterId: text('matter_id'),                    // FK sf_matters.sf_id for cm_call
+  cmUserId: text('cm_user_id'),                   // who was on the call (CM or IS)
+  clientName: text('client_name'),
+  clientPhone: text('client_phone'),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  durationSec: integer('duration_sec'),
+  audioFileRef: text('audio_file_ref'),           // Firebase Storage path
+  audioFileHash: text('audio_file_hash'),
+  status: text('status').notNull().default('uploaded'),
+  // uploaded | transcribing | transcribed | scoring | scored | failed
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+// ---------- Call transcripts (diarized) ----------
+
+export const callTranscripts = pgTable('call_transcripts', {
+  id: text('id').primaryKey(),
+  callId: text('call_id').notNull(),              // FK calls.id
+  provider: text('provider').notNull(),           // 'whisper' | 'assemblyai'
+  segments: jsonb('segments').notNull(),          // [{speaker, start, end, text}]
+  fullText: text('full_text'),                    // concatenated for prompt input
+  language: text('language').default('en'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
+// ---------- Call scores ----------
+// Stores the Claude scoring output verbatim. Shape differs by call_type
+// but we keep one table; `scores` jsonb holds the full validated payload.
+
+export const callScores = pgTable('call_scores', {
+  id: text('id').primaryKey(),
+  callId: text('call_id').notNull(),              // FK calls.id
+  callType: text('call_type').notNull(),          // denormalized
+  rubricVersion: text('rubric_version').notNull(),// 'intake-v8' | 'cm-v1'
+  // For intake calls:
+  verdict: text('verdict'),                       // one of 17
+  valueTier: text('value_tier'),
+  opportunityScore: integer('opportunity_score'),
+  confidence: text('confidence'),
+  // For CM calls:
+  overallScore: integer('overall_score'),
+  // Both:
+  scores: jsonb('scores').notNull(),              // full JSON per rubric
+  rawLlmOutput: jsonb('raw_llm_output'),          // kept for audit
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
+// ---------- Injuries (per-body-region) ----------
+
+export const injuries = pgTable('injuries', {
+  id: text('id').primaryKey(),
+  matterId: text('matter_id'),                    // FK sf_matters.sf_id
+  leadId: text('lead_id'),                        // FK leads.id (pre-retention)
+  bodyRegion: text('body_region').notNull(),
+  severity: text('severity'),                     // minor|moderate|severe|catastrophic
+  erAdmitted: boolean('er_admitted'),
+  erFacility: text('er_facility'),
+  icd10Codes: text('icd10_codes').array(),
+  currentPhase: text('current_phase').default('conservative'),
+  // conservative | imaging | pain_mgmt | surgical | mmi | litigation_ready
+  nextAction: text('next_action'),
+  mmiDate: date('mmi_date'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+// ---------- Treatment events (per-modality per-injury) ----------
+
+export const treatmentEvents = pgTable('treatment_events', {
+  id: text('id').primaryKey(),
+  injuryId: text('injury_id').notNull(),          // FK injuries.id
+  matterId: text('matter_id'),                    // denormalized for query perf
+  modality: text('modality').notNull(),
+  status: text('status').notNull().default('recommended'),
+  providerName: text('provider_name'),
+  scheduledDate: date('scheduled_date'),
+  completedDate: date('completed_date'),
+  outcome: text('outcome'),
+  outcomeNotes: text('outcome_notes'),
+  findings: jsonb('findings'),                    // { herniation: 'L4-L5', ... }
+  declineReason: text('decline_reason'),
+  dependsOn: text('depends_on').array(),          // [treatment_event_id]
+  litifyDamageId: text('litify_damage_id'),       // back-ref to sf_damages.sf_id
+  autoExtractedFromCallId: text('auto_extracted_from_call_id'),
+  autoExtractedConfidence: text('auto_extracted_confidence'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+// ---------- Engagement agreements ----------
+
+export const engagementAgreements = pgTable('engagement_agreements', {
+  id: text('id').primaryKey(),
+  leadId: text('lead_id').notNull(),
+  templateVersion: text('template_version').notNull(),
+  provider: text('provider').default('dropbox_sign'),
+  providerEnvelopeId: text('provider_envelope_id'),
+  status: text('status').notNull().default('draft'),
+  // draft | sent | viewed | signed | voided | expired
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  viewedAt: timestamp('viewed_at', { withTimezone: true }),
+  signedAt: timestamp('signed_at', { withTimezone: true }),
+  voidedAt: timestamp('voided_at', { withTimezone: true }),
+  signerIp: text('signer_ip'),
+  signerEmail: text('signer_email'),
+  signerPhone: text('signer_phone'),
+  signedPdfStorageKey: text('signed_pdf_storage_key'),
+  auditTrailStorageKey: text('audit_trail_storage_key'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+// ---------- Appointments (intake → CM handoff + ongoing) ----------
+
+export const appointments = pgTable('appointments', {
+  id: text('id').primaryKey(),
+  leadId: text('lead_id'),                        // FK leads.id for intro calls
+  matterId: text('matter_id'),                    // FK sf_matters.sf_id once converted
+  cmUserId: text('cm_user_id').notNull(),         // who the appt is with
+  scheduledTs: timestamp('scheduled_ts', { withTimezone: true }).notNull(),
+  durationMin: integer('duration_min').default(30),
+  kind: text('kind').default('intro_call'),
+  // intro_call | check_in | treatment_coord | demand_prep | other
+  status: text('status').notNull().default('pending'),
+  // pending | confirmed | declined | completed | no_show | rescheduled | cancelled
+  remindersEnabled: boolean('reminders_enabled').default(true),
+  reminderLog: jsonb('reminder_log'),
+  // [{ offsetMin: 30, channel: 'sms'|'email', sentAt, delivered }]
+  calendarEventId: text('calendar_event_id'),     // Google or Outlook event id
+  calendarProvider: text('calendar_provider'),    // 'google' | 'outlook' | 'ics'
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+})
+
+// ---------- Inferred row types ----------
+
+export type Lead = typeof leads.$inferSelect
+export type Call = typeof calls.$inferSelect
+export type CallTranscript = typeof callTranscripts.$inferSelect
+export type CallScore = typeof callScores.$inferSelect
+export type Injury = typeof injuries.$inferSelect
+export type TreatmentEvent = typeof treatmentEvents.$inferSelect
+export type EngagementAgreement = typeof engagementAgreements.$inferSelect
+export type Appointment = typeof appointments.$inferSelect
