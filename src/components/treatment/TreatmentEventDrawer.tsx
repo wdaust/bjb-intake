@@ -24,13 +24,13 @@ interface Props {
 }
 
 const TOKEN = {
-  bg: '#0B0B0A',
-  surface: '#141412',
-  border: '#26251F',
-  text: '#EDECE5',
-  muted: '#8A897F',
-  accent: '#6B8DFF',
-  aiTint: '#1B1930',
+  bg: 'var(--background)',
+  surface: 'var(--card)',
+  border: 'var(--border)',
+  text: 'var(--foreground)',
+  muted: 'var(--muted-foreground)',
+  accent: 'var(--ring)',
+  aiTint: 'color-mix(in oklch, var(--ring) 10%, transparent)',
 }
 
 export function TreatmentEventDrawer({

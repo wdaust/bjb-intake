@@ -85,16 +85,16 @@ export function AgreementCard({
   return (
     <div
       className={cn(
-        'rounded-lg border border-[#26251F] bg-[#141412] p-4',
+        'rounded-lg border border-border bg-card p-4',
         className,
       )}
     >
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Engagement agreement
         </div>
         {signerPhone && (
-          <div className="font-mono text-[11px] text-[#8A897F]">
+          <div className="font-mono text-[11px] text-muted-foreground">
             {signerPhone}
           </div>
         )}
@@ -113,9 +113,9 @@ export function AgreementCard({
                   className={cn(
                     'flex h-6 w-6 items-center justify-center rounded-full border transition-all',
                     done
-                      ? 'border-[#6B8DFF]/30 bg-[#6B8DFF]/10 text-[#6B8DFF]'
-                      : 'border-[#26251F] bg-[#1B1A17] text-[#8A897F]',
-                    isCurrent && 'ring-2 ring-[#6B8DFF]/20',
+                      ? 'border-ring/30 bg-ring/10 text-ring'
+                      : 'border-border bg-card text-muted-foreground',
+                    isCurrent && 'ring-2 ring-ring/20',
                     flashing && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
                   )}
                 >
@@ -125,10 +125,10 @@ export function AgreementCard({
                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
                   )}
                 </div>
-                <div className="mt-1 text-[10px] font-medium uppercase tracking-wider text-[#8A897F]">
+                <div className="mt-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                   {step.label}
                 </div>
-                <div className="mt-0.5 font-mono text-[10px] text-[#8A897F]">
+                <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">
                   {i === 0 ? '—' : formatTs(tsFor(step.key))}
                 </div>
               </div>
@@ -136,7 +136,7 @@ export function AgreementCard({
                 <div
                   className={cn(
                     'mx-1 h-[1px] flex-1 -translate-y-4',
-                    i < currentIdx ? 'bg-[#6B8DFF]/30' : 'bg-[#26251F]',
+                    i < currentIdx ? 'bg-ring/30' : 'bg-border',
                   )}
                 />
               )}
@@ -146,11 +146,11 @@ export function AgreementCard({
       </div>
 
       {/* Actions */}
-      <div className="mt-4 flex items-center gap-2 border-t border-[#26251F] pt-3">
+      <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
         {status === 'not_sent' && (
           <Button
             size="sm"
-            className="h-7 rounded-md bg-[#6B8DFF] text-[12px] text-[#0B0B0A] hover:bg-[#6B8DFF]/90"
+            className="h-7 rounded-md bg-ring text-[12px] text-background hover:bg-ring/90"
             onClick={onSend}
           >
             <Send className="mr-1 h-3 w-3" />
@@ -162,7 +162,7 @@ export function AgreementCard({
             <Button
               size="sm"
               variant="outline"
-              className="h-7 rounded-md border-[#26251F] bg-[#141412] text-[12px] text-[#EDECE5] hover:bg-[#1B1930]"
+              className="h-7 rounded-md border-border bg-card text-[12px] text-foreground hover:bg-ring/10"
               onClick={onResend}
             >
               <Send className="mr-1 h-3 w-3" />
@@ -171,7 +171,7 @@ export function AgreementCard({
             <Button
               size="sm"
               variant="outline"
-              className="h-7 rounded-md border-[#26251F] bg-[#141412] text-[12px] text-[#EDECE5] hover:bg-[#1B1930]"
+              className="h-7 rounded-md border-border bg-card text-[12px] text-foreground hover:bg-ring/10"
               onClick={onView}
             >
               <ExternalLink className="mr-1 h-3 w-3" />

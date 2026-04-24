@@ -54,15 +54,15 @@ export function TranscriptViewer({
     <div
       ref={scrollRef}
       className={cn(
-        'overflow-y-auto rounded-lg border border-[#26251F] bg-[#141412]',
+        'overflow-y-auto rounded-lg border border-border bg-card',
         className,
       )}
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#26251F] bg-[#141412]/95 px-4 py-2 backdrop-blur-sm">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-4 py-2 backdrop-blur-sm">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Transcript
         </div>
-        <div className="font-mono text-[11px] text-[#8A897F]">
+        <div className="font-mono text-[11px] text-muted-foreground">
           {segments.length} segments
         </div>
       </div>
@@ -74,21 +74,21 @@ export function TranscriptViewer({
               key={i}
               className={cn(
                 'mb-2 grid grid-cols-[56px_60px_1fr] gap-2 rounded-md px-2 py-1 transition-colors',
-                hit && 'border-l-2 border-[#6B8DFF] bg-[#1B1930] pl-1.5',
+                hit && 'border-l-2 border-ring bg-ring/10 pl-1.5',
               )}
             >
               <button
                 type="button"
                 onClick={() => onSeek?.(seg.start)}
-                className="text-left font-mono text-[11px] text-[#8A897F] transition-colors hover:text-[#6B8DFF]"
+                className="text-left font-mono text-[11px] text-muted-foreground transition-colors hover:text-ring"
                 aria-label={`Seek to ${formatTimestamp(seg.start)}`}
               >
                 [{formatTimestamp(seg.start)}]
               </button>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#8A897F]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                 {seg.speaker}:
               </span>
-              <span className="text-[13px] leading-[1.5] text-[#EDECE5]">
+              <span className="text-[13px] leading-[1.5] text-foreground">
                 {seg.text}
               </span>
             </div>

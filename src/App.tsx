@@ -17,6 +17,18 @@ import { useAuth } from './lib/AuthContext'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
+  // Dev-only bypass for solo demo rehearsal. Gated on import.meta.env.DEV so it
+  // is tree-shaken out of the production bundle. Once `?demo=1` has been seen
+  // in this tab we sticky it to sessionStorage so in-app navigation keeps the
+  // bypass (React Router drops query strings on navigate()).
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    if (window.location.search.includes('demo=1')) {
+      window.sessionStorage.setItem('caos_demo_bypass', '1')
+    }
+    if (window.sessionStorage.getItem('caos_demo_bypass') === '1') {
+      return <>{children}</>
+    }
+  }
   if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>
   if (!user) return <Navigate to="/login" replace />
   return <>{children}</>

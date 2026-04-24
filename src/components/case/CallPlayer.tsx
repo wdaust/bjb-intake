@@ -142,32 +142,32 @@ export function CallPlayer({
   return (
     <div
       className={cn(
-        'flex flex-col rounded-lg border border-[#26251F] bg-[#141412]',
+        'flex flex-col rounded-lg border border-border bg-card',
         className,
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#26251F] px-5 py-3">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
         <div className="flex items-center gap-2">
-          <FileText className="h-3.5 w-3.5 text-[#8A897F]" />
-          <span className="text-[12px] font-medium text-[#EDECE5]">
+          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-[12px] font-medium text-foreground">
             {title}
           </span>
         </div>
-        <span className="font-mono text-[11px] text-[#8A897F]">
+        <span className="font-mono text-[11px] text-muted-foreground">
           {segments.length} segments
         </span>
       </div>
 
       {/* Split body: controls column on the left, synced transcript right */}
-      <div className="grid min-h-0 flex-1 grid-cols-2 divide-x divide-[#26251F]">
+      <div className="grid min-h-0 flex-1 grid-cols-2 divide-x divide-border">
         {/* Left — artwork + controls */}
         <div className="flex flex-col justify-between gap-5 p-5">
           <div className="flex min-h-0 flex-1 items-center justify-center">
             <div
               className={cn(
-                'flex h-32 w-32 items-center justify-center rounded-full border border-[#26251F] bg-[#1B1A17] transition-colors',
-                playing && 'border-[#6B8DFF]/40 bg-[#1B1930]',
+                'flex h-32 w-32 items-center justify-center rounded-full border border-border bg-card transition-colors',
+                playing && 'border-ring/40 bg-ring/10',
               )}
             >
               <WaveformIcon playing={playing} />
@@ -180,7 +180,7 @@ export function CallPlayer({
                 type="button"
                 onClick={togglePlay}
                 aria-label={playing ? 'Pause' : 'Play'}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#6B8DFF] text-[#0B0B0A] transition-colors hover:bg-[#6B8DFF]/90"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-ring text-background transition-colors hover:bg-ring/90"
               >
                 {playing ? (
                   <Pause className="h-4 w-4" />
@@ -189,9 +189,9 @@ export function CallPlayer({
                 )}
               </button>
               <div className="flex-1">
-                <div className="relative h-1 w-full rounded-full bg-[#26251F]">
+                <div className="relative h-1 w-full rounded-full bg-border">
                   <div
-                    className="absolute left-0 top-0 h-full rounded-full bg-[#6B8DFF]/80"
+                    className="absolute left-0 top-0 h-full rounded-full bg-ring/80"
                     style={{ width: `${progressPct}%` }}
                   />
                   <input
@@ -202,12 +202,12 @@ export function CallPlayer({
                     step={0.1}
                     value={currentTime}
                     onChange={onScrub}
-                    className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#EDECE5]"
+                    className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground"
                   />
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-between font-mono text-[11px] text-[#8A897F]">
+            <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground">
               <span>{formatTimestamp(currentTime)}</span>
               <span>{totalLabel}</span>
             </div>
@@ -234,14 +234,14 @@ export function CallPlayer({
                   className={cn(
                     'grid cursor-pointer grid-cols-[52px_56px_1fr] gap-2 rounded-md border-l-2 px-2 py-1 transition-colors',
                     active
-                      ? 'border-[#6B8DFF] bg-[#1B1930]'
-                      : 'border-transparent hover:bg-[#1B1A17]',
+                      ? 'border-ring bg-ring/10'
+                      : 'border-transparent hover:bg-card',
                   )}
                 >
                   <span
                     className={cn(
                       'font-mono text-[11px]',
-                      active ? 'text-[#6B8DFF]' : 'text-[#8A897F]',
+                      active ? 'text-ring' : 'text-muted-foreground',
                     )}
                   >
                     [{formatTimestamp(seg.start)}]
@@ -249,7 +249,7 @@ export function CallPlayer({
                   <span
                     className={cn(
                       'text-[11px] font-bold uppercase tracking-wider',
-                      active ? 'text-[#EDECE5]' : 'text-[#8A897F]',
+                      active ? 'text-foreground' : 'text-muted-foreground',
                     )}
                   >
                     {seg.speaker}:
@@ -257,7 +257,7 @@ export function CallPlayer({
                   <span
                     className={cn(
                       'text-[12px] leading-[1.5]',
-                      active ? 'text-[#EDECE5]' : 'text-[#8A897F]',
+                      active ? 'text-foreground' : 'text-muted-foreground',
                     )}
                   >
                     {seg.text}
@@ -283,7 +283,7 @@ function WaveformIcon({ playing }: { playing: boolean }) {
           width={2}
           height={(i % 2 === 0 ? 8 : 4) * 2}
           rx={1}
-          fill={playing ? '#6B8DFF' : '#8A897F'}
+          fill={playing ? 'var(--ring)' : 'var(--muted-foreground)'}
           style={{
             animation: playing ? `cp-bounce 1.1s ease-in-out infinite` : undefined,
             animationDelay: `${i * 0.12}s`,

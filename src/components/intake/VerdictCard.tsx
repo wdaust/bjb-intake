@@ -33,7 +33,7 @@ export interface VerdictCardProps {
 }
 
 const TAG_TINTS: Record<ReasoningTag, string> = {
-  DECISION: 'bg-[#6B8DFF]/10 text-[#6B8DFF] border-[#6B8DFF]/20',
+  DECISION: 'bg-ring/10 text-ring border-ring/20',
   FIT: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
   SIGNAL: 'bg-teal-500/10 text-teal-300 border-teal-500/20',
   RISK: 'bg-red-500/10 text-red-300 border-red-500/20',
@@ -61,7 +61,7 @@ export function VerdictCard({
   return (
     <div
       className={cn(
-        'rounded-lg border border-[#26251F] bg-[#141412] p-4',
+        'rounded-lg border border-border bg-card p-4',
         className,
       )}
     >
@@ -77,7 +77,7 @@ export function VerdictCard({
             {verdict}
           </span>
           {valueTier && (
-            <span className="inline-flex h-7 items-center rounded-md border border-[#26251F] bg-[#1B1A17] px-2 text-[11px] font-medium text-[#8A897F]">
+            <span className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2 text-[11px] font-medium text-muted-foreground">
               {valueTier}
             </span>
           )}
@@ -90,7 +90,7 @@ export function VerdictCard({
       </div>
 
       {/* Narrative */}
-      <p className="mt-3 text-[12px] leading-[1.55] text-[#EDECE5]">
+      <p className="mt-3 text-[12px] leading-[1.55] text-foreground">
         {narrative}
       </p>
 
@@ -106,7 +106,7 @@ export function VerdictCard({
             >
               {b.tag}
             </span>
-            <span className="text-[12px] leading-[1.55] text-[#EDECE5]">
+            <span className="text-[12px] leading-[1.55] text-foreground">
               {b.text}
             </span>
           </div>
@@ -136,18 +136,18 @@ export function VerdictCard({
       )}
 
       {/* Fact accordions */}
-      <div className="mt-3 space-y-1 border-t border-[#26251F] pt-3">
+      <div className="mt-3 space-y-1 border-t border-border pt-3">
         <FactAccordion title="Key liability facts" items={keyLiabilityFacts} />
         <FactAccordion title="Key damages facts" items={keyDamagesFacts} />
         <FactAccordion title="Weaknesses / risks" items={weaknessesRisks} />
       </div>
 
       {/* Recommended next action */}
-      <div className="mt-3 rounded-md border border-[#6B8DFF]/20 bg-[#1B1930] px-3 py-2">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#6B8DFF]">
+      <div className="mt-3 rounded-md border border-ring/20 bg-ring/10 px-3 py-2">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-ring">
           Recommended next action
         </div>
-        <div className="mt-1 text-[12px] leading-[1.5] text-[#EDECE5]">
+        <div className="mt-1 text-[12px] leading-[1.5] text-foreground">
           {recommendedNextAction}
         </div>
       </div>
@@ -166,12 +166,12 @@ function Stat({
 }) {
   return (
     <div className="flex flex-col items-end">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-[#8A897F]">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <span
         className={cn(
-          'text-[13px] font-semibold text-[#EDECE5]',
+          'text-[13px] font-semibold text-foreground',
           mono && 'font-mono tabular-nums',
         )}
       >
@@ -189,12 +189,12 @@ function FactAccordion({ title, items }: { title: string; items: string[] }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between py-1 text-left text-[12px] font-medium text-[#EDECE5] transition-colors hover:text-[#6B8DFF]"
+        className="flex w-full items-center justify-between py-1 text-left text-[12px] font-medium text-foreground transition-colors hover:text-ring"
       >
         <span>{title}</span>
         <ChevronDown
           className={cn(
-            'h-3.5 w-3.5 text-[#8A897F] transition-transform',
+            'h-3.5 w-3.5 text-muted-foreground transition-transform',
             open && 'rotate-180',
           )}
         />
@@ -204,7 +204,7 @@ function FactAccordion({ title, items }: { title: string; items: string[] }) {
           {items.map((it, i) => (
             <li
               key={i}
-              className="relative text-[12px] leading-[1.5] text-[#EDECE5] before:absolute before:-left-3 before:top-[0.45em] before:h-1 before:w-1 before:rounded-full before:bg-[#8A897F]"
+              className="relative text-[12px] leading-[1.5] text-foreground before:absolute before:-left-3 before:top-[0.45em] before:h-1 before:w-1 before:rounded-full before:bg-muted-foreground"
             >
               {it}
             </li>

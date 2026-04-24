@@ -41,7 +41,7 @@ const ROW_ORDER: RowKey[] = [
 
 // Pale-tint bar colors keyed to score tier.
 function tierClasses(score: number): { bar: string; text: string } {
-  if (score >= 90) return { bar: 'bg-[#6B8DFF]/70', text: 'text-[#6B8DFF]' }
+  if (score >= 90) return { bar: 'bg-ring/70', text: 'text-ring' }
   if (score >= 70) return { bar: 'bg-teal-400/70', text: 'text-teal-300' }
   if (score >= 50) return { bar: 'bg-amber-400/70', text: 'text-amber-300' }
   return { bar: 'bg-red-400/70', text: 'text-red-300' }
@@ -56,12 +56,12 @@ export function CallScoreCard({ scores, className }: CallScoreCardProps) {
   return (
     <div
       className={cn(
-        'rounded-lg border border-[#26251F] bg-[#141412] p-4',
+        'rounded-lg border border-border bg-card p-4',
         className,
       )}
     >
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Call score
         </div>
         <div className="flex items-baseline gap-1">
@@ -73,7 +73,7 @@ export function CallScoreCard({ scores, className }: CallScoreCardProps) {
           >
             {overall}
           </span>
-          <span className="text-[11px] text-[#8A897F]">/ 100</span>
+          <span className="text-[11px] text-muted-foreground">/ 100</span>
         </div>
       </div>
 
@@ -94,7 +94,7 @@ function ScoreRow({ label, dim }: { label: string; dim: ScoreDimension }) {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           {label}
         </div>
         <div className="flex items-baseline gap-1">
@@ -109,14 +109,14 @@ function ScoreRow({ label, dim }: { label: string; dim: ScoreDimension }) {
         </div>
       </div>
 
-      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[#26251F]">
+      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-border">
         <div
           className={cn('h-full rounded-full transition-all', tier.bar)}
           style={{ width: `${Math.max(2, Math.min(100, dim.score))}%` }}
         />
       </div>
 
-      <blockquote className="mt-2 border-l-2 border-[#6B8DFF]/40 pl-3 text-[12px] italic text-[#8A897F]">
+      <blockquote className="mt-2 border-l-2 border-ring/40 pl-3 text-[12px] italic text-muted-foreground">
         &ldquo;{dim.evidence_quote}&rdquo;
       </blockquote>
 
@@ -125,7 +125,7 @@ function ScoreRow({ label, dim }: { label: string; dim: ScoreDimension }) {
           {chips.map((chip, i) => (
             <span
               key={`${chip}-${i}`}
-              className="inline-flex h-5 items-center rounded-full border border-[#26251F] bg-[#1B1A17] px-2 text-[11px] text-[#8A897F]"
+              className="inline-flex h-5 items-center rounded-full border border-border bg-card px-2 text-[11px] text-muted-foreground"
             >
               {chip}
             </span>
@@ -136,13 +136,13 @@ function ScoreRow({ label, dim }: { label: string; dim: ScoreDimension }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="mt-1.5 text-[11px] text-[#8A897F] transition-colors hover:text-[#EDECE5]"
+        className="mt-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
       >
         {open ? 'Hide reasoning' : 'Why this score?'}
       </button>
 
       {open && (
-        <div className="mt-1.5 rounded-md border border-[#26251F] bg-[#1B1930]/40 p-2.5 text-[12px] text-[#EDECE5]">
+        <div className="mt-1.5 rounded-md border border-border bg-ring/10 p-2.5 text-[12px] text-foreground">
           Score reflects how fully the rep hit this rubric dimension. Deductions
           apply for missed required fields, skipped disclosures, or tone
           mismatches. See rubric v8 for full weighting.

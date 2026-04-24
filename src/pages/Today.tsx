@@ -97,9 +97,9 @@ export default function Today() {
   })
 
   return (
-    <div className="mx-auto w-full max-w-[1280px] px-8 py-8">
+    <div className="mx-auto w-full min-w-0 max-w-[1180px] px-6 py-6">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-5">
         <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground font-mono">
           {dateStr}
         </div>
@@ -113,7 +113,7 @@ export default function Today() {
       </div>
 
       {/* Three-column grid */}
-      <div className="grid grid-cols-[1.2fr_1fr] gap-6">
+      <div className="grid grid-cols-[1.2fr_1fr] gap-5">
         {/* Left column — Today's schedule */}
         <section>
           <div className="mb-3 flex items-center justify-between">
@@ -167,7 +167,7 @@ export default function Today() {
           </div>
 
           {/* Active cases needing attention */}
-          <div className="mt-8">
+          <div className="mt-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Active cases needing attention
@@ -258,7 +258,7 @@ export default function Today() {
           </div>
 
           {/* Pace / summary card */}
-          <div className="mt-8 rounded-lg border border-border bg-card p-5">
+          <div className="mt-5 rounded-lg border border-border bg-card p-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Month-to-date
@@ -297,7 +297,7 @@ export default function Today() {
           </div>
 
           {/* Quick actions */}
-          <div className="mt-6 grid grid-cols-2 gap-3">
+          <div className="mt-5 grid grid-cols-2 gap-3">
             <Link
               to="/intake"
               className="rounded-lg border border-border bg-card px-4 py-3 text-[13px] transition-colors hover:bg-accent/40"

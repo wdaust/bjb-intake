@@ -33,16 +33,16 @@ const TIER_STYLES: Record<Exclude<ValueTier, null>, TierStyle> = {
     bar: 'bg-slate-400/70',
   },
   MINIMAL: {
-    badge: 'bg-[#26251F] text-[#8A897F] border border-[#26251F]',
-    bar: 'bg-[#8A897F]/60',
+    badge: 'bg-border text-muted-foreground border border-border',
+    bar: 'bg-muted-foreground/60',
   },
 }
 
 export function tierStyle(tier: ValueTier): TierStyle {
   if (!tier) {
     return {
-      badge: 'bg-[#1B1A17] text-[#8A897F] border border-[#26251F]',
-      bar: 'bg-[#8A897F]/40',
+      badge: 'bg-card text-muted-foreground border border-border',
+      bar: 'bg-muted-foreground/40',
     }
   }
   return TIER_STYLES[tier]

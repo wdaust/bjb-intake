@@ -5,7 +5,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
   ChevronRight,
-  Sparkles,
+  Pause,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CallPlayer } from '@/components/case/CallPlayer'
@@ -218,48 +218,48 @@ export default function CaseDemoDetail() {
   const [audioPlaying, setAudioPlaying] = useState(false)
 
   return (
-    <div className="min-h-screen bg-[#0B0B0A] text-[#EDECE5] font-[Inter_Variable,Inter,system-ui] text-[13px] leading-[1.45]">
+    <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-background text-foreground font-[Inter_Variable,Inter,system-ui] text-[13px] leading-[1.45]">
       {/* Section 1 — sticky header */}
-      <header className="sticky top-0 z-20 border-b border-[#26251F] bg-[#0B0B0A]/95 backdrop-blur-sm">
-        <div className="mx-auto max-w-[1280px] px-8 py-5">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-sm">
+        <div className="mx-auto max-w-[1180px] px-6 py-5">
           {/* Breadcrumb */}
           <button
             type="button"
             onClick={() => navigate('/today')}
-            className="mb-3 inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-[#8A897F] transition-colors hover:text-[#EDECE5]"
+            className="mb-3 inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
           >
             Caseload
-            <ChevronRight className="h-3 w-3 text-[#8A897F]" />
-            <span className="text-[#EDECE5]">Maria Santos</span>
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            <span className="text-foreground">Maria Santos</span>
           </button>
 
           <div className="flex items-start justify-between gap-6">
             <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#26251F] bg-[#1B1A17] text-[14px] font-semibold text-[#EDECE5]">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border bg-card text-[14px] font-semibold text-foreground">
                 MS
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <h1 className="text-[18px] font-semibold text-[#EDECE5]">
+                  <h1 className="text-[18px] font-semibold text-foreground">
                     Maria Santos
                   </h1>
-                  <span className="text-[#8A897F]">·</span>
-                  <span className="text-[13px] text-[#EDECE5]">MVA</span>
-                  <span className="text-[#8A897F]">·</span>
-                  <span className="text-[13px] text-[#EDECE5]">NJ</span>
-                  <span className="text-[#8A897F]">·</span>
-                  <span className="font-mono text-[12px] text-[#8A897F]">
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-[13px] text-foreground">MVA</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-[13px] text-foreground">NJ</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="font-mono text-[12px] text-muted-foreground">
                     MAT-26042500001
                   </span>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="inline-flex h-5 items-center rounded-full border border-[#6B8DFF]/20 bg-[#6B8DFF]/10 px-2 text-[11px] font-medium text-[#6B8DFF]">
+                  <span className="inline-flex h-5 items-center rounded-full border border-[#5B8CFF]/20 bg-[#5B8CFF]/10 px-2 text-[11px] font-medium text-[#5B8CFF]">
                     Active Treatment
                   </span>
                   <button
                     type="button"
                     onClick={() => navigate('/intake/INT-260212225483')}
-                    className="inline-flex items-center gap-1 text-[11px] text-[#8A897F] transition-colors hover:text-[#EDECE5]"
+                    className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
                   >
                     Intake source
                     <ArrowUpRight className="h-3 w-3" />
@@ -273,48 +273,16 @@ export default function CaseDemoDetail() {
               <StatChip label="Treatment events" value="7" />
               <StatChip label="Next action" value="Confirm MRI by tomorrow" wide />
 
-              {/* Live scoring pulse */}
-              <div
-                className={cn(
-                  'ml-2 inline-flex h-7 items-center gap-2 rounded-full border px-2.5 transition-colors',
-                  scored
-                    ? 'border-emerald-400/20 bg-emerald-400/10'
-                    : audioPlaying
-                      ? 'border-[#6B8DFF]/30 bg-[#1B1930]'
-                      : 'border-[#26251F] bg-[#141412]',
-                )}
-              >
-                <span
-                  className={cn(
-                    'h-1.5 w-1.5 rounded-full',
-                    scored
-                      ? 'bg-emerald-400'
-                      : audioPlaying
-                        ? 'animate-pulse bg-[#6B8DFF]'
-                        : 'bg-[#8A897F]',
-                  )}
-                />
-                <span
-                  className={cn(
-                    'text-[10px] font-medium uppercase tracking-wider',
-                    scored
-                      ? 'text-emerald-300'
-                      : audioPlaying
-                        ? 'text-[#6B8DFF]'
-                        : 'text-[#8A897F]',
-                  )}
-                >
-                  {scored ? 'Complete' : audioPlaying ? 'Live scoring' : 'Idle'}
-                </span>
-              </div>
+              {/* State-aware status chip: Ready → Live → Complete */}
+              <StatusChip scored={scored} audioPlaying={audioPlaying} />
             </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1280px] px-8 py-8">
+      <main className="mx-auto max-w-[1180px] px-6 py-6">
         {/* Section 2 — CM call player */}
-        <section className="mb-8">
+        <section className="mb-4">
           <SectionLabel>Case manager intro call</SectionLabel>
           <CallPlayer
             src="/audio/maria_cm_call.mp3"
@@ -327,31 +295,25 @@ export default function CaseDemoDetail() {
           />
         </section>
 
-        {/* Section 3 — post-call AI output */}
-        <section
-          className={cn(
-            'mb-8 transition-all duration-700 ease-out',
-            scored
-              ? 'translate-y-0 opacity-100'
-              : 'pointer-events-none translate-y-4 opacity-40',
-          )}
-        >
-          {scored && (
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1">
-              <Sparkles className="h-3.5 w-3.5 text-emerald-300" />
-              <span className="text-[11px] font-medium uppercase tracking-wider text-emerald-300">
-                AI Scoring Complete
+        {/* Section 3 — post-call AI output (always rendered at full opacity) */}
+        <section className="mb-4">
+          <div className="mb-3 flex items-center justify-between">
+            <SectionLabel>Post-call AI output</SectionLabel>
+            {/* Subtle "updating..." indicator next to the Call Score header */}
+            {audioPlaying && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-[#5B8CFF]">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#5B8CFF]" />
+                updating...
               </span>
-            </div>
-          )}
-          <SectionLabel>Post-call AI output</SectionLabel>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {/* Col 1 — call score */}
             <div className="space-y-4">
               <CallScoreCard scores={CM_CALL_SCORES} />
-              <div className="rounded-lg border border-[#26251F] bg-[#141412] p-4">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+              <div className="rounded-lg border border-border bg-card p-4">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   CM-specific dimensions
                 </div>
                 <div className="mt-3 space-y-3">
@@ -363,23 +325,26 @@ export default function CaseDemoDetail() {
             </div>
 
             {/* Col 2 — extracted treatment updates */}
-            <div className="rounded-lg border border-[#26251F] bg-[#141412] p-4">
+            <div className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center justify-between">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   Auto-extracted treatment updates
                 </div>
-                <span className="font-mono text-[11px] text-[#8A897F]">
+                <span className="font-mono text-[11px] text-muted-foreground">
                   {EXTRACTED_UPDATES.length}
                 </span>
               </div>
               <ul className="mt-3 space-y-3">
-                {EXTRACTED_UPDATES.map((u) => (
+                {EXTRACTED_UPDATES.map((u, i) => (
                   <li
                     key={u.id}
-                    className="rounded-md border border-[#26251F] bg-[#1B1A17] p-3"
+                    className={cn(
+                      'rounded-md border border-border bg-background p-3 transition-all',
+                      audioPlaying && i === 0 && 'animate-live-ring',
+                    )}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="inline-flex h-5 items-center rounded-full border border-[#6B8DFF]/25 bg-[#1B1930] px-2 text-[11px] font-medium text-[#6B8DFF]">
+                      <span className="inline-flex h-5 items-center rounded-full border border-[#5B8CFF]/25 bg-[#5B8CFF]/10 px-2 text-[11px] font-medium text-[#5B8CFF]">
                         {u.modality}
                       </span>
                       <span className="inline-flex h-5 items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 text-[10px] font-medium uppercase tracking-wider text-emerald-300">
@@ -387,14 +352,14 @@ export default function CaseDemoDetail() {
                         Applied
                       </span>
                     </div>
-                    <div className="mt-2 text-[13px] font-medium text-[#EDECE5]">
+                    <div className="mt-2 text-[13px] font-medium text-foreground">
                       {u.headline}
                     </div>
-                    <blockquote className="mt-1.5 border-l-2 border-[#6B8DFF]/40 pl-2.5 text-[12px] italic text-[#8A897F]">
+                    <blockquote className="mt-1.5 border-l-2 border-[#5B8CFF]/40 pl-2.5 text-[12px] italic text-muted-foreground">
                       &ldquo;{u.evidence}&rdquo;
                     </blockquote>
                     {u.note && (
-                      <div className="mt-1.5 text-[11px] text-[#8A897F]">
+                      <div className="mt-1.5 text-[11px] text-muted-foreground">
                         {u.note}
                       </div>
                     )}
@@ -404,27 +369,30 @@ export default function CaseDemoDetail() {
             </div>
 
             {/* Col 3 — action items */}
-            <div className="rounded-lg border border-[#26251F] bg-[#141412] p-4">
+            <div className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center justify-between">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   Action items
                 </div>
-                <span className="font-mono text-[11px] text-[#8A897F]">
+                <span className="font-mono text-[11px] text-muted-foreground">
                   {ACTION_ITEMS.length}
                 </span>
               </div>
               <ul className="mt-3 space-y-2">
-                {ACTION_ITEMS.map((a) => (
+                {ACTION_ITEMS.map((a, i) => (
                   <li
                     key={a.id}
-                    className="flex items-start gap-2.5 rounded-md border border-[#26251F] bg-[#1B1A17] p-2.5"
+                    className={cn(
+                      'flex items-start gap-2.5 rounded-md border border-border bg-background p-2.5 transition-all',
+                      audioPlaying && i === 0 && 'animate-live-ring',
+                    )}
                   >
                     <OwnerBadge owner={a.owner} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-[12px] leading-[1.45] text-[#EDECE5]">
+                      <div className="text-[12px] leading-[1.45] text-foreground">
                         {a.action}
                       </div>
-                      <div className="mt-0.5 font-mono text-[11px] text-[#8A897F]">
+                      <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                         due {a.due}
                       </div>
                     </div>
@@ -436,9 +404,9 @@ export default function CaseDemoDetail() {
         </section>
 
         {/* Section 4 — treatment progression kanban */}
-        <section className="mb-8">
+        <section className="mb-4">
           <SectionLabel>Treatment progression</SectionLabel>
-          <div className="rounded-lg border border-[#26251F] bg-[#141412]">
+          <div className="rounded-lg border border-border bg-card">
             {/* Remount the kanban when state flips so new AI-tinted cards
                 get animated in via a key change. */}
             <TreatmentKanban
@@ -454,7 +422,7 @@ export default function CaseDemoDetail() {
           <button
             type="button"
             onClick={() => navigate('/today')}
-            className="inline-flex items-center gap-1.5 text-[12px] text-[#8A897F] transition-colors hover:text-[#EDECE5]"
+            className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Return to daily brief
@@ -471,7 +439,7 @@ export default function CaseDemoDetail() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+    <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
       {children}
     </div>
   )
@@ -489,16 +457,16 @@ function StatChip({
   return (
     <div
       className={cn(
-        'flex flex-col justify-center rounded-md border border-[#26251F] bg-[#141412] px-3 py-1.5',
+        'flex flex-col justify-center rounded-md border border-border bg-card px-3 py-1.5',
         wide ? 'max-w-[220px]' : 'min-w-[110px]',
       )}
     >
-      <span className="text-[10px] font-medium uppercase tracking-wider text-[#8A897F]">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
       <span
         className={cn(
-          'truncate text-[13px] font-semibold text-[#EDECE5]',
+          'truncate text-[13px] font-semibold text-foreground',
           wide && 'text-[12px] font-medium',
         )}
       >
@@ -508,10 +476,73 @@ function StatChip({
   )
 }
 
+// State-aware chip. Before play → neutral "Ready" with pause icon. While
+// audio playing → pulsing green dot + "LIVE · scoring in real time". After
+// audio ends → green check + "Scoring complete — 96 / 100". Also injects
+// the keyframes for the subtle "animate-live-ring" applied to the newest
+// item card while audio is playing.
+function StatusChip({
+  scored,
+  audioPlaying,
+}: {
+  scored: boolean
+  audioPlaying: boolean
+}) {
+  const state = scored ? 'complete' : audioPlaying ? 'live' : 'ready'
+
+  return (
+    <div
+      className={cn(
+        'ml-2 inline-flex h-7 items-center gap-2 rounded-full border px-2.5 transition-colors',
+        state === 'complete' && 'border-emerald-400/20 bg-emerald-400/10',
+        state === 'live' && 'border-emerald-400/30 bg-emerald-400/10',
+        state === 'ready' && 'border-border bg-card',
+      )}
+    >
+      {state === 'complete' && (
+        <>
+          <CheckCircle2 className="h-3 w-3 text-emerald-300" />
+          <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-300">
+            Scoring complete — 96 / 100
+          </span>
+        </>
+      )}
+      {state === 'live' && (
+        <>
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          </span>
+          <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-300">
+            Live · scoring in real time
+          </span>
+        </>
+      )}
+      {state === 'ready' && (
+        <>
+          <Pause className="h-3 w-3 text-muted-foreground" />
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Ready
+          </span>
+        </>
+      )}
+
+      {/* Keyframes for the subtle 1px border-ring animation on the newest
+          item while audio is playing. Inline <style> keeps this page
+          self-contained rather than polluting global CSS. */}
+      <style>{`@keyframes cp-live-ring {
+        0%,100% { box-shadow: 0 0 0 0 rgba(91, 140, 255, 0); }
+        50% { box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.45); }
+      }
+      .animate-live-ring { animation: cp-live-ring 1.8s ease-in-out infinite; }`}</style>
+    </div>
+  )
+}
+
 function OwnerBadge({ owner }: { owner: Owner }) {
   const style =
     owner === 'CM'
-      ? 'bg-[#1B1930] text-[#6B8DFF] border-[#6B8DFF]/25'
+      ? 'bg-[#5B8CFF]/10 text-[#5B8CFF] border-[#5B8CFF]/25'
       : owner === 'Client'
         ? 'bg-amber-400/10 text-amber-300/90 border-amber-400/20'
         : 'bg-teal-400/10 text-teal-300/90 border-teal-400/20'
@@ -530,7 +561,7 @@ function OwnerBadge({ owner }: { owner: Owner }) {
 function ExtraRow({ d }: { d: ExtraDimension }) {
   const tier =
     d.score >= 90
-      ? { bar: 'bg-[#6B8DFF]/70', text: 'text-[#6B8DFF]' }
+      ? { bar: 'bg-[#5B8CFF]/70', text: 'text-[#5B8CFF]' }
       : d.score >= 70
         ? { bar: 'bg-teal-400/70', text: 'text-teal-300' }
         : { bar: 'bg-amber-400/70', text: 'text-amber-300' }
@@ -538,7 +569,7 @@ function ExtraRow({ d }: { d: ExtraDimension }) {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           {d.label}
         </div>
         <span
@@ -550,13 +581,13 @@ function ExtraRow({ d }: { d: ExtraDimension }) {
           {d.score}
         </span>
       </div>
-      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[#26251F]">
+      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-border">
         <div
           className={cn('h-full rounded-full transition-all', tier.bar)}
           style={{ width: `${Math.max(2, Math.min(100, d.score))}%` }}
         />
       </div>
-      <blockquote className="mt-2 border-l-2 border-[#6B8DFF]/40 pl-3 text-[12px] italic text-[#8A897F]">
+      <blockquote className="mt-2 border-l-2 border-[#5B8CFF]/40 pl-3 text-[12px] italic text-muted-foreground">
         &ldquo;{d.evidence}&rdquo;
       </blockquote>
     </div>

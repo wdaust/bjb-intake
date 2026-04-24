@@ -6,13 +6,48 @@ import {
   Briefcase,
   BarChart3,
   Workflow,
+  ChevronRight,
   LogOut,
-  Command as CommandIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/AuthContext'
 import { useQueue } from '@/lib/QueueContext'
 import { CommandBar } from './CommandBar'
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from '@/components/ui/sidebar'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
+import { Input } from '@/components/ui/input'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+
+// -----------------------------------------------------------------------------
+// Route -> label mapping (single source of truth for nav + breadcrumbs)
+// -----------------------------------------------------------------------------
 
 type IconType = React.ComponentType<{ className?: string }>
 
@@ -21,21 +56,26 @@ interface NavItem {
   path: string
   icon: IconType
   badge?: number
-  /** match nested routes that should keep the item active */
+  /** nested routes that should keep the item active */
   matchPrefixes?: string[]
 }
 
 const NAV_ITEMS: NavItem[] = [
+  // Today is the root route ("/"), so it matches both "/" and "/today".
   { label: 'Today', path: '/today', icon: Home, matchPrefixes: ['/today'] },
   { label: 'Intake', path: '/intake', icon: Inbox, badge: 3, matchPrefixes: ['/intake'] },
-  { label: 'Caseload', path: '/', icon: Briefcase, matchPrefixes: ['/case/', '/call/', '/timeline/', '/summary/'] },
+  {
+    label: 'Caseload',
+    path: '/caseload',
+    icon: Briefcase,
+    matchPrefixes: ['/caseload', '/case/', '/call/', '/timeline/', '/summary/', '/case-demo/'],
+  },
   { label: 'Manager', path: '/manager', icon: BarChart3, matchPrefixes: ['/manager'] },
   { label: 'Flow Builder', path: '/builder', icon: Workflow, matchPrefixes: ['/builder'] },
 ]
 
-// Pretty labels for common path segments when building breadcrumbs.
-const CRUMB_LABELS: Record<string, string> = {
-  '': 'Caseload',
+/** Pretty labels for common path segments. */
+const SEGMENT_LABELS: Record<string, string> = {
   today: 'Today',
   intake: 'Intake',
   case: 'Case',
@@ -43,30 +83,37 @@ const CRUMB_LABELS: Record<string, string> = {
   timeline: 'Timeline',
   summary: 'Summary',
   manager: 'Manager',
-  test: 'Demo Mode',
   builder: 'Flow Builder',
+  test: 'Demo Mode',
 }
 
-function prettifySegment(seg: string): string {
-  if (CRUMB_LABELS[seg]) return CRUMB_LABELS[seg]
-  // Preserve id-like segments (e.g. INT-260424-maria, 0Pp00...) as monospace-ready.
-  return seg
+/** Root slug when the URL is "/". */
+const ROOT_LABEL = 'Today'
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+interface Crumb {
+  label: string
+  href?: string
+  mono?: boolean
 }
 
-function buildBreadcrumbs(pathname: string): Array<{ label: string; href?: string; mono?: boolean }> {
+function buildBreadcrumbs(pathname: string): Crumb[] {
   const segments = pathname.split('/').filter(Boolean)
-  if (segments.length === 0) {
-    return [{ label: 'Caseload' }]
-  }
-  const crumbs: Array<{ label: string; href?: string; mono?: boolean }> = []
+  if (segments.length === 0) return [{ label: ROOT_LABEL }]
+
+  const crumbs: Crumb[] = []
   let acc = ''
   segments.forEach((seg, i) => {
     acc += `/${seg}`
     const isLast = i === segments.length - 1
-    const mapped = CRUMB_LABELS[seg]
-    const looksLikeId = !mapped && /[0-9A-Z\-_]/.test(seg) && (seg.length > 8 || /^[A-Z]{2,}-/.test(seg))
+    const mapped = SEGMENT_LABELS[seg]
+    const looksLikeId =
+      !mapped && /[0-9A-Z\-_]/.test(seg) && (seg.length > 8 || /^[A-Z]{2,}-/.test(seg))
     crumbs.push({
-      label: mapped ?? prettifySegment(seg),
+      label: mapped ?? seg,
       href: isLast ? undefined : acc,
       mono: !mapped && looksLikeId,
     })
@@ -74,17 +121,19 @@ function buildBreadcrumbs(pathname: string): Array<{ label: string; href?: strin
   return crumbs
 }
 
-function initials(name: string): string {
+function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'
   const first = parts[0] ?? ''
   const last = parts.length > 1 ? (parts[parts.length - 1] ?? '') : ''
-  return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || first.charAt(0).toUpperCase()
+  const out = `${first.charAt(0)}${last.charAt(0)}`.toUpperCase()
+  return out || first.charAt(0).toUpperCase()
 }
 
 function isNavActive(item: NavItem, pathname: string): boolean {
+  // Today is the root route: active on "/" or "/today".
+  if (item.path === '/today' && pathname === '/') return true
   if (item.path === '/') {
-    // Caseload is the root; only exact match (nested case/ routes handled via matchPrefixes).
     if (pathname === '/') return true
   } else if (pathname === item.path) {
     return true
@@ -98,6 +147,30 @@ function isNavActive(item: NavItem, pathname: string): boolean {
   return false
 }
 
+/** Collapse sidebar below this viewport width. */
+const COLLAPSE_BREAKPOINT_PX = 1280
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia(query).matches
+  })
+
+  useEffect(() => {
+    const mql = window.matchMedia(query)
+    const onChange = (e: MediaQueryListEvent) => setMatches(e.matches)
+    setMatches(mql.matches)
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [query])
+
+  return matches
+}
+
+// -----------------------------------------------------------------------------
+// Layout
+// -----------------------------------------------------------------------------
+
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -105,23 +178,16 @@ export function Layout() {
   const { cmName } = useQueue()
 
   const [commandOpen, setCommandOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    return window.innerWidth < 1280
-  })
+  const isNarrow = useMediaQuery(`(max-width: ${COLLAPSE_BREAKPOINT_PX - 1}px)`)
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(!isNarrow)
+
+  // When crossing the breakpoint, sync open state to the viewport.
+  useEffect(() => {
+    setSidebarOpen(!isNarrow)
+  }, [isNarrow])
 
   // Full-bleed screens (e.g. guided call) render without the shell chrome.
   const isCallScreen = location.pathname.startsWith('/call/')
-
-  // Auto-collapse sidebar on narrow viewports.
-  useEffect(() => {
-    function onResize() {
-      setCollapsed(window.innerWidth < 1280)
-    }
-    onResize()
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
 
   // Global Cmd+K / Ctrl+K listener.
   useEffect(() => {
@@ -140,6 +206,7 @@ export function Layout() {
 
   const displayName = cmName || user?.displayName || user?.email?.split('@')[0] || 'User'
   const roleLabel = 'Case Manager'
+  const avatarInitials = initialsFromName(displayName)
 
   async function handleLogout() {
     try {
@@ -150,7 +217,6 @@ export function Layout() {
   }
 
   if (isCallScreen) {
-    // Minimal chrome: just render the call view full-bleed.
     return (
       <div className="min-h-screen bg-background text-foreground">
         <Outlet />
@@ -159,193 +225,204 @@ export function Layout() {
     )
   }
 
+  const isMac =
+    typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac')
+
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      {/* -------- Sidebar -------- */}
-      <aside
-        className={cn(
-          'flex shrink-0 flex-col border-r border-border bg-card transition-[width] duration-150',
-          collapsed ? 'w-[56px]' : 'w-[240px]'
-        )}
-        aria-label="Primary"
-      >
-        {/* Brand */}
-        <div
-          className={cn(
-            'flex h-12 items-center border-b border-border',
-            collapsed ? 'justify-center px-0' : 'px-4'
-          )}
-        >
+    <SidebarProvider
+      open={sidebarOpen}
+      onOpenChange={setSidebarOpen}
+      style={
+        {
+          // sidebar-07 style: a tighter 220px rail matching webapp-ui skill rules.
+          '--sidebar-width': '220px',
+          '--sidebar-width-icon': '3rem',
+        } as React.CSSProperties
+      }
+    >
+      <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+        {/* Wordmark */}
+        <SidebarHeader className="px-3 pt-3 pb-2">
           <Link
             to="/"
-            className="flex items-center gap-2 text-primary"
-            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-            aria-label="BJB home"
+            className="flex flex-col gap-0.5 leading-none outline-none group-data-[collapsible=icon]:items-center"
+            aria-label="CAOS home"
           >
-            <span className="text-[18px] font-semibold leading-none tracking-tight">BJB</span>
-            {!collapsed && (
-              <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-                CAOS
-              </span>
-            )}
+            <span className="text-[15px] font-semibold tracking-tight text-sidebar-foreground">
+              CAOS
+            </span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground group-data-[collapsible=icon]:hidden">
+              BJB
+            </span>
           </Link>
-        </div>
+        </SidebarHeader>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-2">
-          <ul className="flex flex-col gap-0.5 px-2">
-            {NAV_ITEMS.map((item) => {
-              const active = isNavActive(item, location.pathname)
-              const Icon = item.icon
-              return (
-                <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    title={collapsed ? item.label : undefined}
-                    className={cn(
-                      'group relative flex items-center rounded-md text-[13px] font-medium transition-colors',
-                      collapsed ? 'h-8 w-10 justify-center' : 'h-8 gap-2 px-2.5',
-                      active
-                        ? 'border-l-2 border-primary bg-primary/10 text-foreground'
-                        : 'border-l-2 border-transparent text-muted-foreground hover:bg-accent/40 hover:text-foreground'
-                    )}
-                  >
-                    <Icon
+        <SidebarContent>
+          <SidebarGroup className="px-2 py-1">
+            <SidebarMenu>
+              {NAV_ITEMS.map((item) => {
+                const active = isNavActive(item, location.pathname)
+                const Icon = item.icon
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      isActive={active}
+                      tooltip={item.label}
                       className={cn(
-                        'h-4 w-4 shrink-0',
-                        active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+                        'h-auto gap-2 rounded-md px-3 py-1.5 text-[13px] font-normal',
+                        // Left accent border on active; transparent otherwise so height stays stable.
+                        'border-l-2 border-transparent',
+                        active &&
+                          'border-ring bg-sidebar-accent text-sidebar-accent-foreground',
+                        !active && 'hover:bg-sidebar-accent/50'
                       )}
-                    />
-                    {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
-                    {!collapsed && typeof item.badge === 'number' && item.badge > 0 && (
-                      <span className="ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-sm bg-muted px-1 font-mono text-[10px] text-foreground/90">
-                        {item.badge}
-                      </span>
-                    )}
-                    {collapsed && typeof item.badge === 'number' && item.badge > 0 && (
-                      <span
-                        className="absolute -right-0.5 -top-0.5 inline-flex h-3 min-w-3 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] text-primary-foreground"
-                        aria-label={`${item.badge} new`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </nav>
+                      render={<Link to={item.path} />}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="flex-1 truncate">{item.label}</span>
+                      {typeof item.badge === 'number' && item.badge > 0 && (
+                        <SidebarMenuBadge
+                          className={cn(
+                            'static ml-auto h-4 min-w-4 rounded bg-muted px-1 font-mono text-[10px] text-muted-foreground',
+                            'group-data-[collapsible=icon]:hidden'
+                          )}
+                        >
+                          {item.badge}
+                        </SidebarMenuBadge>
+                      )}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
 
-        {/* User footer */}
-        <div className="border-t border-border p-2">
-          <div
-            className={cn(
-              'flex items-center rounded-md',
-              collapsed ? 'justify-center' : 'gap-2 px-1.5 py-1.5'
-            )}
-          >
-            <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground"
-              aria-hidden="true"
+        {/* User */}
+        <SidebarFooter className="border-t border-sidebar-border p-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left outline-none transition-colors hover:bg-sidebar-accent/60 focus-visible:bg-sidebar-accent/60"
+                  aria-label="User menu"
+                />
+              }
             >
-              {initials(displayName)}
-            </div>
-            {!collapsed && (
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-medium text-foreground">{displayName}</div>
+              <Avatar className="h-7 w-7 rounded-md">
+                <AvatarFallback className="rounded-md bg-muted text-[11px] font-medium text-foreground">
+                  {avatarInitials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                <div className="truncate text-[12px] font-medium text-sidebar-foreground">
+                  {displayName.length > 24 ? displayName : shortName(displayName)}
+                </div>
                 <div className="truncate text-[11px] text-muted-foreground">{roleLabel}</div>
               </div>
-            )}
-            {!collapsed && (
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          {collapsed && (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="mt-1 flex h-7 w-full items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </aside>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-[200px]">
+              <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                {user?.email ?? displayName}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-3.5 w-3.5" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarFooter>
+      </Sidebar>
 
-      {/* -------- Main column -------- */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      <SidebarInset className="min-w-0 overflow-x-hidden">
         {/* Top bar */}
-        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-4">
-          {/* Breadcrumbs */}
-          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[12px]">
-            {breadcrumbs.map((c, i) => {
-              const isLast = i === breadcrumbs.length - 1
-              return (
-                <span key={`${c.label}-${i}`} className="flex min-w-0 items-center gap-1.5">
-                  {i > 0 && <span className="text-muted-foreground/50">/</span>}
-                  {c.href && !isLast ? (
-                    <Link
-                      to={c.href}
-                      className={cn(
-                        'truncate text-muted-foreground hover:text-foreground',
-                        c.mono && 'font-mono'
+        <header
+          className={cn(
+            'sticky top-0 z-30 flex h-12 w-full min-w-0 shrink-0 items-center gap-3 border-b border-border',
+            'bg-background/95 backdrop-blur-sm px-4'
+          )}
+        >
+          <Breadcrumb className="min-w-0">
+            <BreadcrumbList className="text-[12px]">
+              {breadcrumbs.map((c, i) => {
+                const isLast = i === breadcrumbs.length - 1
+                const key = `${c.label}-${i}`
+                return (
+                  <span key={key} className="inline-flex items-center gap-1.5">
+                    {i > 0 && (
+                      <BreadcrumbSeparator className="text-muted-foreground/60">
+                        <ChevronRight className="h-3 w-3" />
+                      </BreadcrumbSeparator>
+                    )}
+                    <BreadcrumbItem>
+                      {isLast || !c.href ? (
+                        <BreadcrumbPage
+                          className={cn(
+                            'truncate text-foreground',
+                            c.mono && 'font-mono text-[11px]'
+                          )}
+                        >
+                          {c.label}
+                        </BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink
+                          className={cn(
+                            'truncate text-muted-foreground hover:text-foreground',
+                            c.mono && 'font-mono text-[11px]'
+                          )}
+                          render={<Link to={c.href} />}
+                        >
+                          {c.label}
+                        </BreadcrumbLink>
                       )}
-                    >
-                      {c.label}
-                    </Link>
-                  ) : (
-                    <span
-                      className={cn(
-                        'truncate',
-                        isLast ? 'text-foreground' : 'text-muted-foreground',
-                        c.mono && 'font-mono'
-                      )}
-                    >
-                      {c.label}
-                    </span>
-                  )}
-                </span>
-              )
-            })}
-          </nav>
+                    </BreadcrumbItem>
+                  </span>
+                )
+              })}
+            </BreadcrumbList>
+          </Breadcrumb>
 
-          {/* Cmd+K hint */}
-          <button
-            type="button"
-            onClick={() => setCommandOpen(true)}
-            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-card px-2 text-[12px] text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:text-foreground"
-            aria-label="Open command bar"
-          >
-            <CommandIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Search or jump to...</span>
-            <kbd className="inline-flex h-4 items-center rounded border border-border bg-background px-1 font-mono text-[10px] text-muted-foreground">
-              {typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac')
-                ? '\u2318'
-                : 'Ctrl'}
-              K
-            </kbd>
-          </button>
+          {/* Search */}
+          <div className="ml-auto flex items-center">
+            <div className="relative">
+              <Input
+                type="text"
+                readOnly
+                placeholder="Search or jump to..."
+                onFocus={(e) => {
+                  e.currentTarget.blur()
+                  setCommandOpen(true)
+                }}
+                onClick={() => setCommandOpen(true)}
+                className="h-8 w-[260px] cursor-pointer bg-card pr-14 text-[12px]"
+                aria-label="Open command palette"
+              />
+              <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border border-border px-1.5 font-mono text-[11px] text-muted-foreground">
+                {isMac ? '\u2318' : 'Ctrl'}K
+              </span>
+            </div>
+          </div>
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           <Outlet />
         </main>
-      </div>
+      </SidebarInset>
 
-      {/* Command palette */}
       <CommandBar open={commandOpen} onClose={() => setCommandOpen(false)} />
-    </div>
+    </SidebarProvider>
   )
+}
+
+/** Squeeze long names to "First L." for the sidebar footer. */
+function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length < 2) return name
+  const first = parts[0] ?? ''
+  const last = parts[parts.length - 1] ?? ''
+  return `${first} ${last.charAt(0)}.`
 }

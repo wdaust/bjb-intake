@@ -13,9 +13,11 @@ import {
   Clock,
   CheckCircle2,
   User,
-  FileText,
+  ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import {
   initials,
@@ -26,8 +28,7 @@ import {
 } from '@/lib/intakeUtils'
 import { CallScoreCard } from '@/components/intake/CallScoreCard'
 import type { CallScores } from '@/components/intake/CallScoreCard'
-import { VerdictCard } from '@/components/intake/VerdictCard'
-import type { ReasoningBullet } from '@/components/intake/VerdictCard'
+import type { ReasoningBullet, ReasoningTag } from '@/components/intake/VerdictCard'
 import { TranscriptViewer } from '@/components/intake/TranscriptViewer'
 import type { TranscriptSegment } from '@/components/intake/TranscriptViewer'
 import { AgreementCard } from '@/components/intake/AgreementCard'
@@ -274,6 +275,16 @@ const CHECKLIST_ITEMS = [
   { section: 'Closing', items: ['No prior rep', 'No adjuster statements', 'Next steps explained'] },
 ]
 
+const TAG_TINTS: Record<ReasoningTag, string> = {
+  // Neutral labels across the board. Category is conveyed by a 6px dot, not
+  // by a colored background. Keeps the card from looking like a toolbar.
+  DECISION: 'text-muted-foreground',
+  FIT: 'text-muted-foreground',
+  SIGNAL: 'text-muted-foreground',
+  RISK: 'text-muted-foreground',
+  ACTION: 'text-muted-foreground',
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -313,7 +324,7 @@ export default function IntakeDetail() {
 
   if (!lead) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-[#8A897F]">
+      <div className="flex min-h-[60vh] items-center justify-center text-muted-foreground">
         Lead not found.
       </div>
     )
@@ -325,29 +336,33 @@ export default function IntakeDetail() {
   const verdictData = isMaria ? MARIA_FIXTURE.verdict : null
 
   return (
-    <div className="min-h-screen bg-[#0B0B0A] text-[#EDECE5] font-[Inter_Variable,Inter,system-ui] text-[13px] leading-[1.45]">
-      <div className="mx-auto max-w-[1600px] px-6 py-5">
+    <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-[var(--background)] text-[var(--foreground)] font-[Inter_Variable,Inter,system-ui] text-[13px] leading-[1.45]">
+      <div className="mx-auto max-w-[1180px] px-6 py-4">
         {/* Breadcrumb */}
         <button
           type="button"
           onClick={() => navigate('/intake')}
-          className="mb-3 inline-flex items-center gap-1 text-[12px] text-[#8A897F] transition-colors hover:text-[#EDECE5]"
+          className="mb-3 inline-flex items-center gap-1 text-[12px] text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to queue
         </button>
 
-        <div className="grid grid-cols-[280px_minmax(0,1fr)_320px] gap-5">
-          {/* Left rail */}
-          <LeftRail
-            lead={lead}
-            phase={phase}
-            onStartCall={() => setPhase('during_call')}
-            onEndCall={() => setPhase('scored')}
-            onSendAgreement={() => setAgreementStatus('sent')}
-          />
+        <div className="grid grid-cols-[320px_minmax(0,1fr)] gap-5">
+          {/* Left rail — sticky inspector */}
+          <aside className="self-start sticky top-[48px]">
+            <LeftRail
+              lead={lead}
+              phase={phase}
+              agreementStatus={agreementStatus}
+              booking={booking}
+              onStartCall={() => setPhase('during_call')}
+              onEndCall={() => setPhase('scored')}
+              onSendAgreement={() => setAgreementStatus('sent')}
+            />
+          </aside>
 
-          {/* Center */}
+          {/* Main */}
           <div className="min-w-0 space-y-4">
             {phase === 'before_call' && (
               <BeforeCallPanel onStart={() => setPhase('during_call')} />
@@ -380,14 +395,6 @@ export default function IntakeDetail() {
               />
             )}
           </div>
-
-          {/* Right rail */}
-          <RightRail
-            lead={lead}
-            phase={phase}
-            agreementStatus={agreementStatus}
-            booking={booking}
-          />
         </div>
       </div>
     </div>
@@ -395,542 +402,30 @@ export default function IntakeDetail() {
 }
 
 // ---------------------------------------------------------------------------
-// Left rail
+// Left rail — lead summary + SLA + actions + case timeline, all in one column
 // ---------------------------------------------------------------------------
 
 function LeftRail({
   lead,
   phase,
+  agreementStatus,
+  booking,
   onStartCall,
   onEndCall,
   onSendAgreement,
 }: {
   lead: IntakeLead
   phase: LeadPhase
+  agreementStatus: AgreementStatus
+  booking: BookedState | null
   onStartCall: () => void
   onEndCall: () => void
   onSendAgreement: () => void
 }) {
   const sla = slaDisplay(lead.slaDeadline)
   const tStyle = tierStyle(lead.valueTier)
+  const vStyle = verdictStyle(lead.verdict)
 
-  return (
-    <aside className="space-y-3">
-      {/* Lead summary card */}
-      <div className="rounded-lg border border-[#26251F] bg-[#141412] p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#26251F] bg-[#1B1A17] text-[11px] font-semibold text-[#EDECE5]">
-            {initials(lead.name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[14px] font-semibold">
-              {lead.name}
-            </div>
-            <div className="font-mono text-[11px] text-[#8A897F]">
-              {lead.phone}
-            </div>
-          </div>
-        </div>
-        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[12px]">
-          <DtDd label="Case type" value={lead.caseType} />
-          <DtDd label="State" value={lead.state} />
-          <DtDd label="Source" value={lead.source} />
-          <DtDd label="Intake" value={relativeTime(lead.intakeDate)} />
-          <DtDd label="Lead ID" value={lead.id} mono />
-        </dl>
-        {lead.valueTier && (
-          <div className="mt-3 flex items-center gap-2">
-            <div className="h-1 flex-1 overflow-hidden rounded-full bg-[#26251F]">
-              <div
-                className={cn('h-full rounded-full', tStyle.bar)}
-                style={{ width: `${lead.opportunityScore ?? 0}%` }}
-              />
-            </div>
-            <span className="font-mono text-[11px] tabular-nums text-[#EDECE5]">
-              {lead.opportunityScore ?? '—'}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* SLA timer */}
-      <div
-        className={cn(
-          'rounded-lg border px-4 py-3',
-          sla.state === 'urgent'
-            ? 'border-[#6B8DFF]/30 bg-[#1B1930]'
-            : 'border-[#26251F] bg-[#141412]',
-        )}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
-            <Clock className="h-3 w-3" />
-            SLA
-          </div>
-          <span
-            className={cn(
-              'font-mono text-[15px] font-semibold tabular-nums',
-              sla.state === 'urgent' && 'text-[#6B8DFF]',
-              sla.state === 'ok' && 'text-[#EDECE5]',
-              (sla.state === 'passed' || sla.state === 'none') &&
-                'text-[#8A897F]',
-            )}
-          >
-            {sla.label}
-          </span>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="space-y-1.5">
-        {phase === 'before_call' && (
-          <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} onClick={onStartCall} primary>
-            Start call
-          </ActionBtn>
-        )}
-        {phase === 'during_call' && (
-          <ActionBtn icon={<PhoneOff className="h-3.5 w-3.5" />} onClick={onEndCall} primary>
-            End call + score
-          </ActionBtn>
-        )}
-        <ActionBtn
-          icon={<FileSignature className="h-3.5 w-3.5" />}
-          onClick={onSendAgreement}
-        >
-          Send agreement
-        </ActionBtn>
-        <ActionBtn icon={<CalendarPlus className="h-3.5 w-3.5" />}>
-          Schedule
-        </ActionBtn>
-        <ActionBtn icon={<ArrowUpRightFromSquare className="h-3.5 w-3.5" />}>
-          Mark refer-out
-        </ActionBtn>
-        <ActionBtn icon={<XCircle className="h-3.5 w-3.5" />}>
-          Mark rejected
-        </ActionBtn>
-      </div>
-    </aside>
-  )
-}
-
-function DtDd({
-  label,
-  value,
-  mono,
-}: {
-  label: string
-  value: string | null
-  mono?: boolean
-}) {
-  return (
-    <>
-      <dt className="text-[11px] uppercase tracking-wider text-[#8A897F]">
-        {label}
-      </dt>
-      <dd
-        className={cn(
-          'truncate text-[12px] text-[#EDECE5]',
-          mono && 'font-mono',
-        )}
-      >
-        {value ?? '—'}
-      </dd>
-    </>
-  )
-}
-
-function ActionBtn({
-  children,
-  icon,
-  onClick,
-  primary,
-}: {
-  children: React.ReactNode
-  icon: React.ReactNode
-  onClick?: () => void
-  primary?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex h-8 w-full items-center gap-2 rounded-md border px-3 text-left text-[12px] font-medium transition-colors',
-        primary
-          ? 'border-[#6B8DFF]/30 bg-[#6B8DFF] text-[#0B0B0A] hover:bg-[#6B8DFF]/90'
-          : 'border-[#26251F] bg-[#141412] text-[#EDECE5] hover:bg-[#1B1930]',
-      )}
-    >
-      {icon}
-      <span>{children}</span>
-    </button>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Center panels — before / during / scored
-// ---------------------------------------------------------------------------
-
-function BeforeCallPanel({ onStart }: { onStart: () => void }) {
-  return (
-    <>
-      <div className="rounded-lg border border-[#26251F] bg-[#141412] p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
-              Ready to call
-            </div>
-            <div className="mt-1 text-[15px] font-semibold text-[#EDECE5]">
-              Follow the scripted intake flow
-            </div>
-          </div>
-          <Button
-            onClick={onStart}
-            className="h-9 rounded-md bg-[#6B8DFF] px-4 text-[13px] font-semibold text-[#0B0B0A] hover:bg-[#6B8DFF]/90"
-          >
-            <Play className="mr-1.5 h-3.5 w-3.5" />
-            Start call
-          </Button>
-        </div>
-
-        <div className="mt-4 flex items-center gap-2 rounded-md border border-dashed border-[#26251F] bg-[#1B1A17] px-3 py-2.5">
-          <FileAudio className="h-4 w-4 text-[#8A897F]" />
-          <div className="flex-1 text-[12px] text-[#8A897F]">
-            Or upload a pre-recorded call (.wav, .mp3, .m4a)
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 rounded-md border-[#26251F] bg-[#141412] text-[12px] text-[#EDECE5] hover:bg-[#1B1930]"
-          >
-            Choose file
-          </Button>
-        </div>
-      </div>
-
-      <div className="rounded-lg border border-[#26251F] bg-[#141412] p-4">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
-          Intake checklist
-        </div>
-        <div className="mt-3 space-y-3">
-          {CHECKLIST_ITEMS.map((section) => (
-            <ChecklistSection
-              key={section.section}
-              title={section.section}
-              items={section.items}
-            />
-          ))}
-        </div>
-      </div>
-    </>
-  )
-}
-
-function ChecklistSection({ title, items }: { title: string; items: string[] }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="rounded-md border border-[#26251F] bg-[#1B1A17]">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-3 py-2 text-left"
-      >
-        <span className="text-[12px] font-medium text-[#EDECE5]">{title}</span>
-        <span className="font-mono text-[11px] text-[#8A897F]">
-          {items.length}
-        </span>
-      </button>
-      {open && (
-        <ul className="border-t border-[#26251F] px-3 py-2">
-          {items.map((it) => (
-            <li
-              key={it}
-              className="flex items-center gap-2 py-0.5 text-[12px] text-[#EDECE5]"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-[#26251F]" />
-              {it}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-function DuringCallPanel({
-  transcript,
-  facts,
-  onEnd,
-}: {
-  transcript: TranscriptSegment[]
-  facts: ExtractedFacts | null
-  onEnd: () => void
-}) {
-  return (
-    <>
-      <div className="flex items-center justify-between rounded-lg border border-[#6B8DFF]/30 bg-[#1B1930] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-[#6B8DFF]" />
-          <span className="text-[12px] font-medium text-[#EDECE5]">
-            Call in progress
-          </span>
-          <span className="font-mono text-[11px] text-[#8A897F]">
-            auto-transcribing
-          </span>
-        </div>
-        <Button
-          onClick={onEnd}
-          size="sm"
-          className="h-7 rounded-md bg-[#6B8DFF] px-3 text-[12px] font-semibold text-[#0B0B0A] hover:bg-[#6B8DFF]/90"
-        >
-          End call + score
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
-        <TranscriptViewer
-          segments={transcript}
-          autoScroll
-          className="max-h-[620px]"
-        />
-        <ExtractedFactsPanel facts={facts} live />
-      </div>
-    </>
-  )
-}
-
-function ScoredPanel({
-  verdictData,
-  scores,
-  facts,
-  transcript,
-  highlightQuote,
-  onHoverScoreQuote,
-  agreementStatus,
-  onSendAgreement,
-  onResendAgreement,
-  onViewAgreement,
-  booking,
-  onBook,
-}: {
-  verdictData: typeof MARIA_FIXTURE.verdict
-  scores: CallScores
-  facts: ExtractedFacts | null
-  transcript: TranscriptSegment[]
-  highlightQuote: string | undefined
-  onHoverScoreQuote: (q: string | undefined) => void
-  agreementStatus: AgreementStatus
-  onSendAgreement: () => void
-  onResendAgreement: () => void
-  onViewAgreement: () => void
-  booking: BookedState | null
-  onBook: (b: BookedState) => void
-}) {
-  const [transcriptOpen, setTranscriptOpen] = useState(false)
-
-  return (
-    <>
-      <VerdictCard
-        verdict={verdictData.verdict}
-        valueTier={verdictData.valueTier}
-        opportunityScore={verdictData.opportunityScore}
-        confidence={verdictData.confidence}
-        estValueRange={verdictData.estValueRange}
-        reasoningBullets={verdictData.reasoningBullets}
-        narrative={verdictData.narrative}
-        greenSignals={verdictData.greenSignals}
-        redSignals={verdictData.redSignals}
-        keyLiabilityFacts={verdictData.keyLiabilityFacts}
-        keyDamagesFacts={verdictData.keyDamagesFacts}
-        weaknessesRisks={verdictData.weaknessesRisks}
-        recommendedNextAction={verdictData.recommendedNextAction}
-      />
-
-      <div
-        onMouseLeave={() => onHoverScoreQuote(undefined)}
-        className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4"
-      >
-        <div
-          onMouseEnter={() =>
-            onHoverScoreQuote(scores.information_capture.evidence_quote)
-          }
-        >
-          <CallScoreCard scores={scores} />
-        </div>
-        <ExtractedFactsPanel facts={facts} />
-      </div>
-
-      <AgreementCard
-        status={agreementStatus}
-        sentAt={MARIA_FIXTURE.agreement.sentAt}
-        viewedAt={MARIA_FIXTURE.agreement.viewedAt}
-        signedAt={MARIA_FIXTURE.agreement.signedAt}
-        signerPhone={MARIA_FIXTURE.agreement.signerPhone}
-        onSend={onSendAgreement}
-        onResend={onResendAgreement}
-        onView={onViewAgreement}
-      />
-
-      <AppointmentScheduler
-        cmOptions={CM_OPTIONS}
-        onBook={onBook}
-        booked={booking}
-      />
-
-      <div className="rounded-lg border border-[#26251F] bg-[#141412]">
-        <button
-          type="button"
-          onClick={() => setTranscriptOpen((o) => !o)}
-          className="flex w-full items-center justify-between px-4 py-3 text-left"
-        >
-          <span className="flex items-center gap-2 text-[12px] font-medium text-[#EDECE5]">
-            <FileText className="h-3.5 w-3.5 text-[#8A897F]" />
-            Full transcript
-          </span>
-          <span className="font-mono text-[11px] text-[#8A897F]">
-            {transcript.length} segments
-          </span>
-        </button>
-        {transcriptOpen && (
-          <TranscriptViewer
-            segments={transcript}
-            highlightQuote={highlightQuote}
-            className="max-h-[480px] rounded-none border-0 border-t"
-          />
-        )}
-      </div>
-    </>
-  )
-}
-
-function ExtractedFactsPanel({
-  facts,
-  live,
-}: {
-  facts: ExtractedFacts | null
-  live?: boolean
-}) {
-  return (
-    <div className="rounded-lg border border-[#26251F] bg-[#141412] p-4">
-      <div className="flex items-center justify-between">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
-          Auto-extracted facts
-        </div>
-        {live ? (
-          <span className="inline-flex items-center gap-1 text-[11px] text-[#6B8DFF]">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#6B8DFF]" />
-            live
-          </span>
-        ) : (
-          <CheckCircle2 className="h-3 w-3 text-[#6B8DFF]" />
-        )}
-      </div>
-
-      {!facts && (
-        <div className="mt-4 text-[12px] text-[#8A897F]">
-          No facts yet. They&rsquo;ll populate as the call progresses.
-        </div>
-      )}
-
-      {facts && (
-        <dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-[12px]">
-          <FactRow label="Incident" value={facts.incidentDate} mono />
-          <FactRow label="Venue" value={facts.incidentVenue} />
-          <FactRow label="Defendant" value={facts.defendant} />
-          <FactRow
-            label="Commercial"
-            value={
-              facts.commercialDefendant === null
-                ? null
-                : facts.commercialDefendant
-                  ? 'Yes'
-                  : 'No'
-            }
-          />
-          <FactRow
-            label="ER visit"
-            value={
-              facts.erVisit === null
-                ? null
-                : facts.erVisit
-                  ? `Yes — ${facts.erFacility ?? 'facility TBD'}`
-                  : 'No'
-            }
-          />
-          <FactRow label="Police" value={facts.policeReport} mono />
-          <FactRow
-            label="Witnesses"
-            value={
-              facts.witnesses.length === 0
-                ? null
-                : facts.witnesses.map((w) => w.name).join(', ')
-            }
-          />
-          <FactRow label="Insurance" value={facts.clientInsurance} />
-          <FactRow
-            label="Prior rep"
-            value={
-              facts.priorRepresentation === null
-                ? null
-                : facts.priorRepresentation
-                  ? 'Yes'
-                  : 'No'
-            }
-          />
-        </dl>
-      )}
-
-      {facts?.narrative && (
-        <div className="mt-3 rounded-md border border-[#26251F] bg-[#1B1A17] p-2.5 text-[12px] leading-[1.5] text-[#EDECE5]">
-          {facts.narrative}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FactRow({
-  label,
-  value,
-  mono,
-}: {
-  label: string
-  value: string | null
-  mono?: boolean
-}) {
-  return (
-    <>
-      <dt className="text-[11px] uppercase tracking-wider text-[#8A897F]">
-        {label}
-      </dt>
-      <dd
-        className={cn(
-          'text-[12px] text-[#EDECE5]',
-          mono && 'font-mono tabular-nums',
-          !value && 'text-[#8A897F]',
-        )}
-      >
-        {value ?? '—'}
-      </dd>
-    </>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Right rail — case timeline
-// ---------------------------------------------------------------------------
-
-function RightRail({
-  lead,
-  phase,
-  agreementStatus,
-  booking,
-}: {
-  lead: IntakeLead
-  phase: LeadPhase
-  agreementStatus: AgreementStatus
-  booking: BookedState | null
-}) {
   const events = useMemo<TimelineEvent[]>(() => {
     const out: TimelineEvent[] = [
       {
@@ -989,16 +484,48 @@ function RightRail({
     )
   }, [lead, phase, agreementStatus, booking])
 
-  const vStyle = verdictStyle(lead.verdict)
-
   return (
-    <aside className="space-y-3">
-      <div className="rounded-lg border border-[#26251F] bg-[#141412] p-4">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
-          Verdict
+    <div className="space-y-3">
+      {/* Lead summary card */}
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-[12px] font-semibold text-[var(--foreground)]">
+            {initials(lead.name)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[14px] font-semibold">
+              {lead.name}
+            </div>
+            <div className="font-mono text-[11px] text-[var(--muted-foreground)]">
+              {lead.phone}
+            </div>
+          </div>
         </div>
-        <div className="mt-2 flex items-center justify-between">
-          {lead.verdict ? (
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[12px]">
+          <DtDd label="Case type" value={lead.caseType} />
+          <DtDd label="State" value={lead.state} />
+          <DtDd label="Source" value={lead.source} />
+          <DtDd label="Intake" value={relativeTime(lead.intakeDate)} />
+          <DtDd label="Lead ID" value={lead.id} mono />
+          {lead.assignedTo && <DtDd label="CM" value={lead.assignedTo} />}
+        </dl>
+
+        {/* Opportunity bar + verdict pill */}
+        {lead.valueTier && (
+          <div className="mt-3 flex items-center gap-2">
+            <div className="h-1 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
+              <div
+                className={cn('h-full rounded-full', tStyle.bar)}
+                style={{ width: `${lead.opportunityScore ?? 0}%` }}
+              />
+            </div>
+            <span className="font-mono text-[11px] tabular-nums text-[var(--foreground)]">
+              {lead.opportunityScore ?? '—'}
+            </span>
+          </div>
+        )}
+        {lead.verdict && (
+          <div className="mt-2 flex items-center justify-between">
             <span
               className={cn(
                 'inline-flex h-5 items-center rounded-full px-2 text-[11px] font-medium',
@@ -1007,22 +534,75 @@ function RightRail({
             >
               {lead.verdict}
             </span>
-          ) : (
-            <span className="text-[#8A897F]">Pending</span>
-          )}
-          <span className="font-mono text-[13px] font-semibold tabular-nums text-[#EDECE5]">
-            {lead.opportunityScore ?? '—'}
-          </span>
-        </div>
-        {lead.estValueRange && (
-          <div className="mt-1 font-mono text-[12px] text-[#8A897F]">
-            {lead.estValueRange}
+            {lead.estValueRange && (
+              <span className="font-mono text-[11px] text-[var(--muted-foreground)]">
+                {lead.estValueRange}
+              </span>
+            )}
           </div>
         )}
       </div>
 
-      <div className="rounded-lg border border-[#26251F] bg-[#141412] p-4">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-[#8A897F]">
+      {/* SLA timer */}
+      <div
+        className={cn(
+          'rounded-lg border px-4 py-3',
+          sla.state === 'urgent'
+            ? 'border-[var(--ring)]/30 bg-[var(--ring)]'
+            : 'border-[var(--border)] bg-[var(--card)]',
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
+            <Clock className="h-3 w-3" />
+            SLA
+          </div>
+          <span
+            className={cn(
+              'font-mono text-[15px] font-semibold tabular-nums',
+              sla.state === 'urgent' && 'text-[var(--ring)]',
+              sla.state === 'ok' && 'text-[var(--foreground)]',
+              (sla.state === 'passed' || sla.state === 'none') &&
+                'text-[var(--muted-foreground)]',
+            )}
+          >
+            {sla.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="space-y-1.5">
+        {phase === 'before_call' && (
+          <ActionBtn icon={<Phone className="h-3.5 w-3.5" />} onClick={onStartCall} primary>
+            Start call
+          </ActionBtn>
+        )}
+        {phase === 'during_call' && (
+          <ActionBtn icon={<PhoneOff className="h-3.5 w-3.5" />} onClick={onEndCall} primary>
+            End call + score
+          </ActionBtn>
+        )}
+        <ActionBtn
+          icon={<FileSignature className="h-3.5 w-3.5" />}
+          onClick={onSendAgreement}
+        >
+          Send agreement
+        </ActionBtn>
+        <ActionBtn icon={<CalendarPlus className="h-3.5 w-3.5" />}>
+          Schedule
+        </ActionBtn>
+        <ActionBtn icon={<ArrowUpRightFromSquare className="h-3.5 w-3.5" />}>
+          Mark refer-out
+        </ActionBtn>
+        <ActionBtn icon={<XCircle className="h-3.5 w-3.5" />}>
+          Mark rejected
+        </ActionBtn>
+      </div>
+
+      {/* Case timeline */}
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
           Case timeline
         </div>
         <ol className="mt-3 space-y-3">
@@ -1035,9 +615,594 @@ function RightRail({
           ))}
         </ol>
       </div>
-    </aside>
+    </div>
   )
 }
+
+function DtDd({
+  label,
+  value,
+  mono,
+}: {
+  label: string
+  value: string | null
+  mono?: boolean
+}) {
+  return (
+    <>
+      <dt className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]">
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          'truncate text-[12px] text-[var(--foreground)]',
+          mono && 'font-mono',
+        )}
+      >
+        {value ?? '—'}
+      </dd>
+    </>
+  )
+}
+
+function ActionBtn({
+  children,
+  icon,
+  onClick,
+  primary,
+}: {
+  children: React.ReactNode
+  icon: React.ReactNode
+  onClick?: () => void
+  primary?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex h-8 w-full items-center gap-2 rounded-md border px-3 text-left text-[12px] font-medium transition-colors',
+        primary
+          ? 'border-[var(--ring)]/30 bg-[var(--ring)] text-[var(--background)] hover:bg-[var(--ring)]/90'
+          : 'border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--ring)]',
+      )}
+    >
+      {icon}
+      <span>{children}</span>
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Before / during call panels (unchanged behavior, kept for phase gating)
+// ---------------------------------------------------------------------------
+
+function BeforeCallPanel({ onStart }: { onStart: () => void }) {
+  return (
+    <>
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
+              Ready to call
+            </div>
+            <div className="mt-1 text-[15px] font-semibold text-[var(--foreground)]">
+              Follow the scripted intake flow
+            </div>
+          </div>
+          <Button
+            onClick={onStart}
+            className="h-9 rounded-md bg-[var(--ring)] px-4 text-[13px] font-semibold text-[var(--background)] hover:bg-[var(--ring)]/90"
+          >
+            <Play className="mr-1.5 h-3.5 w-3.5" />
+            Start call
+          </Button>
+        </div>
+
+        <div className="mt-4 flex items-center gap-2 rounded-md border border-dashed border-[var(--border)] bg-[var(--card)] px-3 py-2.5">
+          <FileAudio className="h-4 w-4 text-[var(--muted-foreground)]" />
+          <div className="flex-1 text-[12px] text-[var(--muted-foreground)]">
+            Or upload a pre-recorded call (.wav, .mp3, .m4a)
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 rounded-md border-[var(--border)] bg-[var(--card)] text-[12px] text-[var(--foreground)] hover:bg-[var(--ring)]"
+          >
+            Choose file
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
+          Intake checklist
+        </div>
+        <div className="mt-3 space-y-3">
+          {CHECKLIST_ITEMS.map((section) => (
+            <ChecklistSection
+              key={section.section}
+              title={section.section}
+              items={section.items}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function ChecklistSection({ title, items }: { title: string; items: string[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="rounded-md border border-[var(--border)] bg-[var(--card)]">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-3 py-2 text-left"
+      >
+        <span className="text-[12px] font-medium text-[var(--foreground)]">{title}</span>
+        <span className="font-mono text-[11px] text-[var(--muted-foreground)]">
+          {items.length}
+        </span>
+      </button>
+      {open && (
+        <ul className="border-t border-[var(--border)] px-3 py-2">
+          {items.map((it) => (
+            <li
+              key={it}
+              className="flex items-center gap-2 py-0.5 text-[12px] text-[var(--foreground)]"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--border)]" />
+              {it}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function DuringCallPanel({
+  transcript,
+  facts,
+  onEnd,
+}: {
+  transcript: TranscriptSegment[]
+  facts: ExtractedFacts | null
+  onEnd: () => void
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between rounded-lg border border-[var(--ring)]/30 bg-[var(--ring)] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--ring)]" />
+          <span className="text-[12px] font-medium text-[var(--foreground)]">
+            Call in progress
+          </span>
+          <span className="font-mono text-[11px] text-[var(--muted-foreground)]">
+            auto-transcribing
+          </span>
+        </div>
+        <Button
+          onClick={onEnd}
+          size="sm"
+          className="h-7 rounded-md bg-[var(--ring)] px-3 text-[12px] font-semibold text-[var(--background)] hover:bg-[var(--ring)]/90"
+        >
+          End call + score
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-4">
+        <TranscriptViewer
+          segments={transcript}
+          autoScroll
+          className="max-h-[620px]"
+        />
+        <ExtractedFactsPanel facts={facts} live />
+      </div>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Scored panel — compact verdict hero + tabs
+// ---------------------------------------------------------------------------
+
+function ScoredPanel({
+  verdictData,
+  scores,
+  facts,
+  transcript,
+  highlightQuote,
+  onHoverScoreQuote,
+  agreementStatus,
+  onSendAgreement,
+  onResendAgreement,
+  onViewAgreement,
+  booking,
+  onBook,
+}: {
+  verdictData: typeof MARIA_FIXTURE.verdict
+  scores: CallScores
+  facts: ExtractedFacts | null
+  transcript: TranscriptSegment[]
+  highlightQuote: string | undefined
+  onHoverScoreQuote: (q: string | undefined) => void
+  agreementStatus: AgreementStatus
+  onSendAgreement: () => void
+  onResendAgreement: () => void
+  onViewAgreement: () => void
+  booking: BookedState | null
+  onBook: (b: BookedState) => void
+}) {
+  return (
+    <>
+      <VerdictHero data={verdictData} />
+
+      <Tabs defaultValue="scoring" className="gap-3">
+        <TabsList
+          variant="line"
+          className="h-9 w-full justify-start gap-0 border-b border-[var(--border)]"
+        >
+          <TabsTrigger
+            value="scoring"
+            className="h-9 rounded-none px-3 text-[12px] font-medium data-active:text-[var(--foreground)]"
+          >
+            Scoring
+          </TabsTrigger>
+          <TabsTrigger
+            value="facts"
+            className="h-9 rounded-none px-3 text-[12px] font-medium data-active:text-[var(--foreground)]"
+          >
+            Facts
+          </TabsTrigger>
+          <TabsTrigger
+            value="agreement"
+            className="h-9 rounded-none px-3 text-[12px] font-medium data-active:text-[var(--foreground)]"
+          >
+            Agreement
+          </TabsTrigger>
+          <TabsTrigger
+            value="appointment"
+            className="h-9 rounded-none px-3 text-[12px] font-medium data-active:text-[var(--foreground)]"
+          >
+            Appointment
+          </TabsTrigger>
+          <TabsTrigger
+            value="transcript"
+            className="h-9 rounded-none px-3 text-[12px] font-medium data-active:text-[var(--foreground)]"
+          >
+            Transcript
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="scoring" className="min-h-[480px]">
+          <div
+            onMouseLeave={() => onHoverScoreQuote(undefined)}
+            onMouseEnter={() =>
+              onHoverScoreQuote(scores.information_capture.evidence_quote)
+            }
+          >
+            <CallScoreCard scores={scores} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="facts" className="min-h-[480px]">
+          <ExtractedFactsPanel facts={facts} />
+        </TabsContent>
+
+        <TabsContent value="agreement" className="min-h-[480px]">
+          <AgreementCard
+            status={agreementStatus}
+            sentAt={MARIA_FIXTURE.agreement.sentAt}
+            viewedAt={MARIA_FIXTURE.agreement.viewedAt}
+            signedAt={MARIA_FIXTURE.agreement.signedAt}
+            signerPhone={MARIA_FIXTURE.agreement.signerPhone}
+            onSend={onSendAgreement}
+            onResend={onResendAgreement}
+            onView={onViewAgreement}
+          />
+        </TabsContent>
+
+        <TabsContent value="appointment" className="min-h-[480px]">
+          <AppointmentScheduler
+            cmOptions={CM_OPTIONS}
+            onBook={onBook}
+            booked={booking}
+          />
+        </TabsContent>
+
+        <TabsContent value="transcript" className="min-h-[480px]">
+          <TranscriptViewer
+            segments={transcript}
+            highlightQuote={highlightQuote}
+            className="max-h-[640px]"
+          />
+        </TabsContent>
+      </Tabs>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Compact verdict hero card — single card, all above-the-fold content
+// ---------------------------------------------------------------------------
+
+function VerdictHero({ data }: { data: typeof MARIA_FIXTURE.verdict }) {
+  return (
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+      {/* Top row — pill + tier + stats */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Badge
+          variant="outline"
+          className="h-6 rounded-md border-[var(--ring)]/30 bg-[var(--ring)]/10 px-2 text-[11px] font-semibold tracking-wide text-[var(--ring)]"
+        >
+          {data.verdict}
+        </Badge>
+        <Badge
+          variant="outline"
+          className="h-6 rounded-md border-[var(--border)] bg-[var(--card)] px-2 text-[11px] font-medium text-[var(--muted-foreground)]"
+        >
+          {data.valueTier}
+        </Badge>
+        <div className="ml-auto flex items-baseline gap-4">
+          <HeroStat label="Opportunity" value={String(data.opportunityScore)} mono />
+          <HeroStat label="Est. value" value={data.estValueRange} mono />
+          <HeroStat label="Confidence" value={data.confidence} />
+        </div>
+      </div>
+
+      {/* Narrative */}
+      <p className="mt-3 text-[12px] leading-[1.55] text-[var(--foreground)]">
+        {data.narrative}
+      </p>
+
+      {/* Reasoning bullets — uppercase grey label, no colored backgrounds */}
+      <div className="mt-4 divide-y divide-border/60 border-y border-border/60">
+        {data.reasoningBullets.map((b, i) => (
+          <div
+            key={i}
+            className="grid grid-cols-[72px_1fr] items-baseline gap-x-3 py-2"
+          >
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              {b.tag}
+            </span>
+            <span className="text-[12px] leading-[1.55] text-foreground">
+              {b.text}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Green / red signal chips — neutral chip with ✓ / × glyph */}
+      {(data.greenSignals.length > 0 || data.redSignals.length > 0) && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {data.greenSignals.map((s, i) => (
+            <span
+              key={`g-${i}`}
+              className="inline-flex h-5 items-center gap-1 rounded border border-border bg-card px-1.5 text-[11px] text-foreground"
+            >
+              <span className="text-muted-foreground">✓</span>
+              {s}
+            </span>
+          ))}
+          {data.redSignals.map((s, i) => (
+            <span
+              key={`r-${i}`}
+              className="inline-flex h-5 items-center gap-1 rounded border border-border bg-card px-1.5 text-[11px] text-muted-foreground"
+            >
+              <span>×</span>
+              {s}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Recommended next action — quiet accent, not a hero banner */}
+      <div className="mt-4 flex items-start gap-3 rounded-md border border-border border-l-2 border-l-ring bg-card/50 px-3 py-2.5">
+        <div className="flex-1">
+          <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Recommended next action
+          </div>
+          <div className="mt-1 text-[12px] leading-[1.5] text-foreground">
+            {data.recommendedNextAction}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HeroStat({
+  label,
+  value,
+  mono,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+}) {
+  return (
+    <div className="flex flex-col items-end">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
+        {label}
+      </span>
+      <span
+        className={cn(
+          'text-[13px] font-semibold text-[var(--foreground)]',
+          mono && 'font-mono tabular-nums',
+        )}
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Facts panel (local — unchanged)
+// ---------------------------------------------------------------------------
+
+function ExtractedFactsPanel({
+  facts,
+  live,
+}: {
+  facts: ExtractedFacts | null
+  live?: boolean
+}) {
+  return (
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-[var(--muted-foreground)]">
+          Auto-extracted facts
+        </div>
+        {live ? (
+          <span className="inline-flex items-center gap-1 text-[11px] text-[var(--ring)]">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--ring)]" />
+            live
+          </span>
+        ) : (
+          <CheckCircle2 className="h-3 w-3 text-[var(--ring)]" />
+        )}
+      </div>
+
+      {!facts && (
+        <div className="mt-4 text-[12px] text-[var(--muted-foreground)]">
+          No facts yet. They&rsquo;ll populate as the call progresses.
+        </div>
+      )}
+
+      {facts && (
+        <dl className="mt-3 grid grid-cols-[110px_1fr] gap-x-3 gap-y-2 text-[12px]">
+          <FactRow label="Incident" value={facts.incidentDate} mono />
+          <FactRow label="Venue" value={facts.incidentVenue} />
+          <FactRow label="Defendant" value={facts.defendant} />
+          <FactRow
+            label="Commercial"
+            value={
+              facts.commercialDefendant === null
+                ? null
+                : facts.commercialDefendant
+                  ? 'Yes'
+                  : 'No'
+            }
+          />
+          <FactRow
+            label="ER visit"
+            value={
+              facts.erVisit === null
+                ? null
+                : facts.erVisit
+                  ? `Yes — ${facts.erFacility ?? 'facility TBD'}`
+                  : 'No'
+            }
+          />
+          <FactRow label="Police" value={facts.policeReport} mono />
+          <FactRow
+            label="Witnesses"
+            value={
+              facts.witnesses.length === 0
+                ? null
+                : facts.witnesses.map((w) => w.name).join(', ')
+            }
+          />
+          <FactRow label="Insurance" value={facts.clientInsurance} />
+          <FactRow
+            label="Prior rep"
+            value={
+              facts.priorRepresentation === null
+                ? null
+                : facts.priorRepresentation
+                  ? 'Yes'
+                  : 'No'
+            }
+          />
+        </dl>
+      )}
+
+      {facts?.narrative && (
+        <div className="mt-3 rounded-md border border-[var(--border)] bg-[var(--card)] p-2.5 text-[12px] leading-[1.5] text-[var(--foreground)]">
+          {facts.narrative}
+        </div>
+      )}
+
+      {/* Key fact accordions — moved here so Facts tab owns the full picture */}
+      {facts && (
+        <div className="mt-3 space-y-1 border-t border-[var(--border)] pt-3">
+          <FactAccordion title="Key liability facts" items={MARIA_FIXTURE.verdict.keyLiabilityFacts} />
+          <FactAccordion title="Key damages facts" items={MARIA_FIXTURE.verdict.keyDamagesFacts} />
+          <FactAccordion title="Weaknesses / risks" items={MARIA_FIXTURE.verdict.weaknessesRisks} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FactAccordion({ title, items }: { title: string; items: string[] }) {
+  const [open, setOpen] = useState(false)
+  if (items.length === 0) return null
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between py-1 text-left text-[12px] font-medium text-[var(--foreground)] transition-colors hover:text-[var(--ring)]"
+      >
+        <span>{title}</span>
+        <ChevronDown
+          className={cn(
+            'h-3.5 w-3.5 text-[var(--muted-foreground)] transition-transform',
+            open && 'rotate-180',
+          )}
+        />
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-1 pb-1.5 pl-3">
+          {items.map((it, i) => (
+            <li
+              key={i}
+              className="relative text-[12px] leading-[1.5] text-[var(--foreground)] before:absolute before:-left-3 before:top-[0.45em] before:h-1 before:w-1 before:rounded-full before:bg-[var(--muted-foreground)]"
+            >
+              {it}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function FactRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string
+  value: string | null
+  mono?: boolean
+}) {
+  return (
+    <>
+      <dt className="text-[11px] uppercase tracking-wider text-[var(--muted-foreground)]">
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          'text-[12px] text-[var(--foreground)]',
+          mono && 'font-mono tabular-nums',
+          !value && 'text-[var(--muted-foreground)]',
+        )}
+      >
+        {value ?? '—'}
+      </dd>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Timeline row
+// ---------------------------------------------------------------------------
 
 function TimelineRow({
   event,
@@ -1050,21 +1215,21 @@ function TimelineRow({
   return (
     <li className="relative flex gap-3">
       {!last && (
-        <span className="absolute left-[11px] top-6 h-full w-px bg-[#26251F]" />
+        <span className="absolute left-[11px] top-6 h-full w-px bg-[var(--border)]" />
       )}
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#26251F] bg-[#1B1A17] text-[#6B8DFF]">
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--card)] text-[var(--ring)]">
         {icon}
       </div>
       <div className="min-w-0 flex-1 pb-1">
-        <div className="text-[12px] font-medium text-[#EDECE5]">
+        <div className="text-[12px] font-medium text-[var(--foreground)]">
           {event.label}
         </div>
         {event.detail && (
-          <div className="truncate text-[11px] text-[#8A897F]">
+          <div className="truncate text-[11px] text-[var(--muted-foreground)]">
             {event.detail}
           </div>
         )}
-        <div className="mt-0.5 font-mono text-[10px] text-[#8A897F]">
+        <div className="mt-0.5 font-mono text-[10px] text-[var(--muted-foreground)]">
           {relativeTime(event.ts)}
         </div>
       </div>

@@ -248,7 +248,7 @@ export function Caseload() {
       {/* Daily Stats Banner */}
       <div className="rounded-xl border border-border/30 bg-gradient-to-r from-primary/5 via-transparent to-teal-500/5 p-4">
         <div className="flex items-center justify-between">
-          <div className="flex gap-6">
+          <div className="flex gap-5">
             <div className="text-center">
               <p className="text-2xl font-bold stat-number">{cmStats.totalCases.toLocaleString()}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total Cases</p>

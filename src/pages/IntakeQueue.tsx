@@ -287,7 +287,7 @@ export default function IntakeQueue({ leads = MOCK_LEADS }: IntakeQueueProps) {
   }, [leads, preset, stateFilter, verdictFilter, slaFilter, query])
 
   return (
-    <div className="min-h-screen bg-[#0B0B0A] text-[#EDECE5] font-[Inter_Variable,Inter,system-ui] text-[13px] leading-[1.45]">
+    <div className="min-h-screen bg-background text-foreground font-[Inter_Variable,Inter,system-ui] text-[13px] leading-[1.45]">
       <div className="mx-auto max-w-[1400px] px-6 py-5">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -295,7 +295,7 @@ export default function IntakeQueue({ leads = MOCK_LEADS }: IntakeQueueProps) {
             <h1 className="text-[17px] font-semibold tracking-tight">
               Intake Queue
             </h1>
-            <span className="inline-flex items-center rounded-full border border-[#26251F] bg-[#141412] px-2 py-0.5 text-[11px] font-medium text-[#8A897F]">
+            <span className="inline-flex items-center rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
               {filtered.length}
             </span>
           </div>
@@ -304,7 +304,7 @@ export default function IntakeQueue({ leads = MOCK_LEADS }: IntakeQueueProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name, ID, case type"
-              className="h-8 w-64 border-[#26251F] bg-[#141412] text-[13px] placeholder:text-[#8A897F]"
+              className="h-8 w-64 border-border bg-card text-[13px] placeholder:text-muted-foreground"
             />
           </div>
         </div>
@@ -318,8 +318,8 @@ export default function IntakeQueue({ leads = MOCK_LEADS }: IntakeQueueProps) {
               className={cn(
                 'h-7 rounded-md border px-2.5 text-[12px] font-medium transition-colors',
                 preset === p.key
-                  ? 'border-[#26251F] bg-[#1B1930] text-[#EDECE5]'
-                  : 'border-transparent text-[#8A897F] hover:bg-[#141412] hover:text-[#EDECE5]',
+                  ? 'border-border bg-ring/10 text-foreground'
+                  : 'border-transparent text-muted-foreground hover:bg-card hover:text-foreground',
               )}
             >
               {p.label}
@@ -350,8 +350,8 @@ export default function IntakeQueue({ leads = MOCK_LEADS }: IntakeQueueProps) {
         </div>
 
         {/* Table */}
-        <div className="mt-4 overflow-hidden rounded-lg border border-[#26251F] bg-[#141412]">
-          <div className="grid grid-cols-[minmax(220px,1.6fr)_70px_90px_110px_minmax(160px,1.2fr)_150px_110px_70px_120px] items-center gap-3 border-b border-[#26251F] px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-[#8A897F]">
+        <div className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
+          <div className="grid grid-cols-[minmax(220px,1.6fr)_70px_90px_110px_minmax(160px,1.2fr)_150px_110px_70px_120px] items-center gap-3 border-b border-border px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <div>Lead</div>
             <div>State</div>
             <div>Source</div>
@@ -396,28 +396,28 @@ function LeadRow({ lead, onOpen }: { lead: IntakeLead; onOpen: () => void }) {
       onKeyDown={(e) => {
         if (e.key === 'Enter') onOpen()
       }}
-      className="group grid h-9 cursor-pointer grid-cols-[minmax(220px,1.6fr)_70px_90px_110px_minmax(160px,1.2fr)_150px_110px_70px_120px] items-center gap-3 border-b border-[#26251F] px-4 text-[13px] hover:bg-[#1A1915] focus:bg-[#1A1915] focus:outline-none last:border-0"
+      className="group grid h-9 cursor-pointer grid-cols-[minmax(220px,1.6fr)_70px_90px_110px_minmax(160px,1.2fr)_150px_110px_70px_120px] items-center gap-3 border-b border-border px-4 text-[13px] hover:bg-accent/40 focus:bg-accent/40 focus:outline-none last:border-0"
     >
       {/* Name + case type */}
       <div className="min-w-0">
-        <div className="truncate font-semibold text-[#EDECE5]">{lead.name}</div>
-        <div className="truncate text-[11px] text-[#8A897F]">
+        <div className="truncate font-semibold text-foreground">{lead.name}</div>
+        <div className="truncate text-[11px] text-muted-foreground">
           {lead.caseType}
         </div>
       </div>
 
       {/* State */}
       <div>
-        <span className="inline-flex h-5 items-center rounded-full border border-[#26251F] bg-[#1B1A17] px-2 text-[11px] font-medium text-[#8A897F]">
+        <span className="inline-flex h-5 items-center rounded-full border border-border bg-card px-2 text-[11px] font-medium text-muted-foreground">
           {lead.state}
         </span>
       </div>
 
       {/* Source */}
-      <div className="truncate text-[#8A897F] capitalize">{lead.source}</div>
+      <div className="truncate text-muted-foreground capitalize">{lead.source}</div>
 
       {/* Intake date */}
-      <div className="font-mono text-[12px] text-[#8A897F]">
+      <div className="font-mono text-[12px] text-muted-foreground">
         {relativeTime(lead.intakeDate)}
       </div>
 
@@ -433,19 +433,19 @@ function LeadRow({ lead, onOpen }: { lead: IntakeLead; onOpen: () => void }) {
             {lead.verdict}
           </span>
         ) : (
-          <span className="text-[#8A897F]">—</span>
+          <span className="text-muted-foreground">—</span>
         )}
       </div>
 
       {/* Opportunity score */}
       <div className="flex items-center gap-2">
-        <div className="h-1 w-20 overflow-hidden rounded-full bg-[#26251F]">
+        <div className="h-1 w-20 overflow-hidden rounded-full bg-border">
           <div
             className={cn('h-full rounded-full', tStyle.bar)}
             style={{ width: `${Math.max(2, score)}%` }}
           />
         </div>
-        <span className="w-7 text-right font-mono text-[12px] tabular-nums text-[#EDECE5]">
+        <span className="w-7 text-right font-mono text-[12px] tabular-nums text-foreground">
           {lead.opportunityScore ?? '—'}
         </span>
       </div>
@@ -454,9 +454,9 @@ function LeadRow({ lead, onOpen }: { lead: IntakeLead; onOpen: () => void }) {
       <div
         className={cn(
           'font-mono text-[12px] tabular-nums',
-          sla.state === 'urgent' && 'text-[#6B8DFF]',
-          sla.state === 'ok' && 'text-[#EDECE5]',
-          (sla.state === 'passed' || sla.state === 'none') && 'text-[#8A897F]',
+          sla.state === 'urgent' && 'text-ring',
+          sla.state === 'ok' && 'text-foreground',
+          (sla.state === 'passed' || sla.state === 'none') && 'text-muted-foreground',
         )}
       >
         {sla.label}
@@ -467,12 +467,12 @@ function LeadRow({ lead, onOpen }: { lead: IntakeLead; onOpen: () => void }) {
         {lead.assignedTo ? (
           <div
             title={lead.assignedTo}
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-[#26251F] bg-[#1B1A17] text-[10px] font-semibold text-[#EDECE5]"
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-[10px] font-semibold text-foreground"
           >
             {initials(lead.assignedTo)}
           </div>
         ) : (
-          <span className="text-[#8A897F]">—</span>
+          <span className="text-muted-foreground">—</span>
         )}
       </div>
 
@@ -523,7 +523,7 @@ function RowIconButton({
     <button
       aria-label={label}
       onClick={onClick}
-      className="flex h-6 w-6 items-center justify-center rounded-md border border-[#26251F] bg-[#141412] text-[#8A897F] hover:bg-[#1B1930] hover:text-[#EDECE5]"
+      className="flex h-6 w-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-ring/10 hover:text-foreground"
     >
       {children}
     </button>
@@ -543,10 +543,10 @@ function FilterSelect({
 }) {
   return (
     <Select value={value} onValueChange={(v) => v && onChange(v)}>
-      <SelectTrigger className="h-7 min-w-[120px] border-[#26251F] bg-[#141412] px-2 text-[12px] text-[#EDECE5]">
+      <SelectTrigger className="h-7 min-w-[120px] border-border bg-card px-2 text-[12px] text-foreground">
         <span className="truncate">{label}</span>
       </SelectTrigger>
-      <SelectContent className="border-[#26251F] bg-[#141412] text-[13px] text-[#EDECE5]">
+      <SelectContent className="border-border bg-card text-[13px] text-foreground">
         {options.map((opt) => (
           <SelectItem key={opt} value={opt}>
             {opt}
@@ -560,14 +560,14 @@ function FilterSelect({
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="text-[13px] text-[#EDECE5]">No leads in queue</div>
-      <div className="mt-1 text-[12px] text-[#8A897F]">
+      <div className="text-[13px] text-foreground">No leads in queue</div>
+      <div className="mt-1 text-[12px] text-muted-foreground">
         New leads will appear here automatically.
       </div>
       <Button
         variant="outline"
         size="sm"
-        className="mt-4 border-[#26251F] bg-[#141412] text-[#EDECE5] hover:bg-[#1B1930]"
+        className="mt-4 border-border bg-card text-foreground hover:bg-ring/10"
         onClick={() => window.location.reload()}
       >
         Refresh
