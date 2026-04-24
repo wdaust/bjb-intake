@@ -11,6 +11,7 @@ import { TestMode } from './pages/TestMode'
 import { FlowBuilder } from './pages/FlowBuilder'
 import IntakeQueue from './pages/IntakeQueue'
 import IntakeDetail from './pages/IntakeDetail'
+import CaseDemoDetail from './pages/CaseDemoDetail'
 import Today from './pages/Today'
 import { useAuth } from './lib/AuthContext'
 
@@ -31,6 +32,7 @@ function App() {
         <Route path="/caseload" element={<Caseload />} />
         <Route path="/intake" element={<IntakeQueue />} />
         <Route path="/intake/:leadId" element={<IntakeDetail />} />
+        <Route path="/case-demo/:leadId" element={<CaseDemoDetail />} />
         <Route path="/case/:caseId" element={<CaseSnapshot />} />
         <Route path="/call/:caseId" element={<GuidedCall />} />
         <Route path="/timeline/:caseId" element={<Timeline />} />
