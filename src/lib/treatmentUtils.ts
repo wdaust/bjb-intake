@@ -90,6 +90,22 @@ export interface TreatmentEvent {
   findings?: string
   declineReason?: DeclineReason
   autoExtractedFromCall: boolean
+  /** Display name shown on the card and in the editor (falls back to MODALITY_LABEL[modality]). */
+  name?: string
+  /** Override of the phase/stage computed from `modality`. Useful for ad-hoc events. */
+  stage?: Phase
+  /** Stable ordering within a column for drag-to-reorder. */
+  orderIndex?: number
+  /** CM notes, surfaced in the side sheet. */
+  notes?: string
+  /** Provider field alias; when set, preferred over `providerName`. */
+  provider?: string
+  /** Flag this event for attention. */
+  urgency?: boolean
+  /** Added from an AI-suggested provider/protocol (distinct from call-extracted). */
+  aiSuggested?: boolean
+  /** Confidence score 0-100 when aiSuggested is true. */
+  aiSuggestionConfidence?: number
 }
 
 // ---------- Phase ordering ----------

@@ -4,14 +4,26 @@ import {
   ArrowLeft,
   ArrowUpRight,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Pause,
+  TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CallPlayer } from '@/components/case/CallPlayer'
 import type { CallPlayerSegment } from '@/components/case/CallPlayer'
-import { CallScoreCard } from '@/components/intake/CallScoreCard'
 import type { CallScores } from '@/components/intake/CallScoreCard'
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/accordion'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { TreatmentKanban } from '@/components/treatment/TreatmentKanban'
 import {
   DEMO_INJURIES,
@@ -55,8 +67,25 @@ const CM_CALL_SEGMENTS: CallPlayerSegment[] = [
   { speaker: 'JESS', start: 263.2, end: 265.7, text: "We've got you. Talk to you Friday." },
 ]
 
+// Shorter seed transcript for the earlier Mark × Maria intake-triage call.
+const INTAKE_TRIAGE_SEGMENTS: CallPlayerSegment[] = [
+  { speaker: 'MARK', start: 0, end: 6, text: "Hi Maria, this is Mark with Brandon J. Broderick's office. You reached out through our website — do you have a few minutes to walk through what happened?" },
+  { speaker: 'MARIA', start: 6.4, end: 10.8, text: 'Yeah, sure. I got rear-ended on the Turnpike last week and I\'ve been in a lot of pain.' },
+  { speaker: 'MARK', start: 11.2, end: 18, text: 'I\'m sorry you\'re dealing with that. Let me take some basics and then we\'ll hand you off to one of our case managers who will stay with you end-to-end. Date of the accident?' },
+  { speaker: 'MARIA', start: 18.4, end: 22.1, text: 'Last Tuesday. Around 4pm. Near exit 11 on the Turnpike.' },
+  { speaker: 'MARK', start: 22.5, end: 27.8, text: 'Got it. And were you taken to the hospital? Did police respond?' },
+  { speaker: 'MARIA', start: 28.2, end: 38, text: 'Yeah, state police came, paramedics brought me to Robert Wood Johnson. I was there about five hours. They did a CT, no fracture, sent me home with muscle relaxers.' },
+  { speaker: 'MARK', start: 38.4, end: 45.1, text: 'Okay. Any followup since? Primary care, specialist, anything?' },
+  { speaker: 'MARIA', start: 45.5, end: 52.2, text: "I saw my regular doctor Thursday. She wants me to do PT and maybe an MRI if it doesn't get better." },
+  { speaker: 'MARK', start: 52.6, end: 62, text: "Good, that's helpful. I'm going to get you set up with our case manager Jess — she\'ll coordinate treatment from here and walk you through insurance. You\'ll hear from her tomorrow." },
+  { speaker: 'MARIA', start: 62.4, end: 65, text: 'Okay. That sounds great. Thank you.' },
+  { speaker: 'MARK', start: 65.4, end: 72.5, text: "One last thing — have you spoken with any other attorney or firm about this? We just want to make sure we're the only ones." },
+  { speaker: 'MARIA', start: 72.9, end: 75.8, text: 'No, you guys are the only ones.' },
+  { speaker: 'MARK', start: 76.2, end: 82, text: "Perfect. We're going to take good care of you. You\'ll hear from Jess tomorrow morning." },
+]
+
 // ---------------------------------------------------------------------------
-// Post-call AI artifacts
+// Post-call AI artifacts — the CM intro call (today)
 // ---------------------------------------------------------------------------
 
 const CM_CALL_SCORES: CallScores = {
@@ -73,13 +102,51 @@ const CM_CALL_SCORES: CallScores = {
     score: 90,
     evidence_quote: "We've got you. Talk to you Friday.",
   },
-  // The four-field CallScores type doesn't have treatment_coordination /
-  // next_step_clarity slots, so we surface those as separate highlight
-  // rows below. The top card keeps parity with the intake-side design.
   call_progression: {
     score: 100,
     evidence_quote:
       "Here's what I'm going to do today: get PT scheduled, send confirmation...",
+  },
+}
+
+// Earlier-call seed scores. These drive the trend chip (74 → 88 → 96).
+const INTAKE_TRIAGE_SCORES: CallScores = {
+  information_capture: {
+    score: 88,
+    evidence_quote: 'Date of the accident? ... Were you taken to the hospital?',
+  },
+  compliance: {
+    score: 92,
+    evidence_quote:
+      "Have you spoken with any other attorney or firm about this?",
+  },
+  empathy: {
+    score: 82,
+    evidence_quote: "I'm sorry you're dealing with that.",
+  },
+  call_progression: {
+    score: 90,
+    evidence_quote:
+      "I'm going to get you set up with our case manager Jess — she'll coordinate treatment from here.",
+  },
+}
+
+const INITIAL_TRIAGE_SCORES: CallScores = {
+  information_capture: {
+    score: 72,
+    evidence_quote: 'Intake form captured — basic contact only.',
+  },
+  compliance: {
+    score: 78,
+    evidence_quote: 'Standard website disclosure acknowledged.',
+  },
+  empathy: {
+    score: 70,
+    evidence_quote: 'Brief hold time, apologetic tone.',
+  },
+  call_progression: {
+    score: 76,
+    evidence_quote: 'Handed off to intake specialist within 24 hours.',
   },
 }
 
@@ -91,8 +158,8 @@ interface ExtraDimension {
 }
 
 // Treatment coordination + next-step clarity — the two dimensions the CM
-// rubric adds on top of the shared four. We render them inline under the
-// CallScoreCard so every rubric callout from the brief shows up.
+// rubric adds on top of the shared four. Shown as extra rows inside the
+// expanded hero so every rubric callout from the brief shows up.
 const EXTRA_DIMENSIONS: ExtraDimension[] = [
   {
     key: 'treatment_coordination',
@@ -192,12 +259,69 @@ const ACTION_ITEMS: ActionItem[] = [
 ]
 
 // ---------------------------------------------------------------------------
+// Multi-call data model
+// ---------------------------------------------------------------------------
+
+interface Call {
+  id: string
+  date: string // short human label (e.g. "Today · Apr 24", "Apr 21")
+  dateSort: number // for ordering
+  callType: string
+  participants: string
+  duration: string
+  audioUrl: string | null
+  transcript: CallPlayerSegment[]
+  scores: CallScores
+  extraDimensions?: ExtraDimension[] // CM-specific callouts
+  isCurrent?: boolean // this is the CM call that drives audioPlaying/scored
+}
+
+const CALLS: Call[] = [
+  {
+    id: 'call-cm-intro',
+    date: 'Today · Apr 24',
+    dateSort: 20260424,
+    callType: 'CM Intro Call',
+    participants: 'Jess × Maria',
+    duration: '3:51',
+    audioUrl: '/audio/maria_cm_call.mp3',
+    transcript: CM_CALL_SEGMENTS,
+    scores: CM_CALL_SCORES,
+    extraDimensions: EXTRA_DIMENSIONS,
+    isCurrent: true,
+  },
+  {
+    id: 'call-intake-triage',
+    date: 'Apr 21',
+    dateSort: 20260421,
+    callType: 'Intake Triage',
+    participants: 'Mark × Maria',
+    duration: '2:45',
+    audioUrl: '/audio/maria_intake_call1.mp3',
+    transcript: INTAKE_TRIAGE_SEGMENTS,
+    scores: INTAKE_TRIAGE_SCORES,
+  },
+  {
+    id: 'call-initial',
+    date: 'Apr 18',
+    dateSort: 20260418,
+    callType: 'Initial Triage',
+    participants: 'Website intake',
+    duration: '1:12',
+    audioUrl: null,
+    transcript: [],
+    scores: INITIAL_TRIAGE_SCORES,
+  },
+]
+
+// Newest-first; the default expanded row is CALLS[0].
+const CALLS_SORTED = [...CALLS].sort((a, b) => b.dateSort - a.dateSort)
+
+// ---------------------------------------------------------------------------
 // Kanban states — before-call (no post-call extractions) vs. after-call
 // ---------------------------------------------------------------------------
 
 const PRE_CALL_EVENTS: TreatmentEvent[] = DEMO_EVENTS.map((e) => {
-  // Before the Jess call, the post-call PT recs have not been extracted yet.
-  // Drop the lumbar MRI + the AI-tagged PT entries to show the base state.
   if (e.id === 'evt-c-pt' || e.id === 'evt-l-pt' || e.id === 'evt-l-mri') {
     return null
   }
@@ -209,6 +333,58 @@ const POST_CALL_EVENTS: TreatmentEvent[] = DEMO_EVENTS
 const KANBAN_INJURIES: Injury[] = DEMO_INJURIES
 
 // ---------------------------------------------------------------------------
+// Score helpers
+// ---------------------------------------------------------------------------
+
+const ROW_ORDER = [
+  'information_capture',
+  'compliance',
+  'empathy',
+  'call_progression',
+] as const
+
+type RowKey = (typeof ROW_ORDER)[number]
+
+const ROW_LABELS: Record<RowKey, string> = {
+  information_capture: 'Information capture',
+  compliance: 'Compliance',
+  empathy: 'Empathy',
+  call_progression: 'Call progression',
+}
+
+function overallScore(scores: CallScores): number {
+  return Math.round(
+    ROW_ORDER.reduce((sum, k) => sum + scores[k].score, 0) / ROW_ORDER.length,
+  )
+}
+
+function tierClasses(score: number): {
+  bar: string
+  text: string
+  ring: string
+} {
+  if (score >= 90)
+    return { bar: 'bg-ring/70', text: 'text-ring', ring: 'border-ring/40' }
+  if (score >= 70)
+    return {
+      bar: 'bg-teal-400/70',
+      text: 'text-teal-300',
+      ring: 'border-teal-400/30',
+    }
+  if (score >= 50)
+    return {
+      bar: 'bg-amber-400/70',
+      text: 'text-amber-300',
+      ring: 'border-amber-400/30',
+    }
+  return {
+    bar: 'bg-red-400/70',
+    text: 'text-red-300',
+    ring: 'border-red-400/30',
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -216,6 +392,11 @@ export default function CaseDemoDetail() {
   const navigate = useNavigate()
   const [scored, setScored] = useState(false)
   const [audioPlaying, setAudioPlaying] = useState(false)
+
+  const currentCall = CALLS_SORTED[0]
+  if (!currentCall) return null
+
+  const currentOverall = overallScore(currentCall.scores)
 
   return (
     <div className="min-h-screen w-full min-w-0 overflow-x-hidden bg-background text-foreground font-[Inter_Variable,Inter,system-ui] text-[13px] leading-[1.45]">
@@ -272,8 +453,6 @@ export default function CaseDemoDetail() {
               <StatChip label="Days in pre-lit" value="1" />
               <StatChip label="Treatment events" value="7" />
               <StatChip label="Next action" value="Confirm MRI by tomorrow" wide />
-
-              {/* State-aware status chip: Ready → Live → Complete */}
               <StatusChip scored={scored} audioPlaying={audioPlaying} />
             </div>
           </div>
@@ -281,25 +460,35 @@ export default function CaseDemoDetail() {
       </header>
 
       <main className="mx-auto max-w-[1180px] px-6 py-6">
-        {/* Section 2 — CM call player */}
-        <section className="mb-4">
-          <SectionLabel>Case manager intro call</SectionLabel>
-          <CallPlayer
-            src="/audio/maria_cm_call.mp3"
-            title="CM Intro Call · 3:51 · Jess Martin × Maria Santos"
-            durationLabel="3:51"
-            segments={CM_CALL_SEGMENTS}
-            onComplete={() => setScored(true)}
-            onPlayingChange={setAudioPlaying}
-            className="h-[480px]"
+        {/* Section 2 — Call Score hero (collapsible) */}
+        <section className="mb-5">
+          <CallScoreHero
+            call={currentCall}
+            overall={currentOverall}
+            allCalls={CALLS_SORTED}
+            audioPlaying={audioPlaying}
           />
         </section>
 
-        {/* Section 3 — post-call AI output (always rendered at full opacity) */}
-        <section className="mb-4">
+        {/* Section 3 — multi-call accordion stack */}
+        <section className="mb-5">
+          <div className="mb-3 flex items-center justify-between">
+            <SectionLabel>All calls on this case</SectionLabel>
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {CALLS_SORTED.length} calls
+            </span>
+          </div>
+          <CallStack
+            calls={CALLS_SORTED}
+            onCurrentComplete={() => setScored(true)}
+            onCurrentPlayingChange={setAudioPlaying}
+          />
+        </section>
+
+        {/* Section 4 — post-call AI output (updates + action items) */}
+        <section className="mb-5">
           <div className="mb-3 flex items-center justify-between">
             <SectionLabel>Post-call AI output</SectionLabel>
-            {/* Subtle "updating..." indicator next to the Call Score header */}
             {audioPlaying && (
               <span className="inline-flex items-center gap-1.5 text-[11px] text-[#5B8CFF]">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#5B8CFF]" />
@@ -308,23 +497,8 @@ export default function CaseDemoDetail() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {/* Col 1 — call score */}
-            <div className="space-y-4">
-              <CallScoreCard scores={CM_CALL_SCORES} />
-              <div className="rounded-lg border border-border bg-card p-4">
-                <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  CM-specific dimensions
-                </div>
-                <div className="mt-3 space-y-3">
-                  {EXTRA_DIMENSIONS.map((d) => (
-                    <ExtraRow key={d.key} d={d} />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Col 2 — extracted treatment updates */}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Col 1 — extracted treatment updates */}
             <div className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center justify-between">
                 <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -368,7 +542,7 @@ export default function CaseDemoDetail() {
               </ul>
             </div>
 
-            {/* Col 3 — action items */}
+            {/* Col 2 — action items */}
             <div className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center justify-between">
                 <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -403,12 +577,10 @@ export default function CaseDemoDetail() {
           </div>
         </section>
 
-        {/* Section 4 — treatment progression kanban */}
+        {/* Section 5 — treatment progression kanban (untouched) */}
         <section className="mb-4">
           <SectionLabel>Treatment progression</SectionLabel>
           <div className="rounded-lg border border-border bg-card">
-            {/* Remount the kanban when state flips so new AI-tinted cards
-                get animated in via a key change. */}
             <TreatmentKanban
               key={scored ? 'post' : 'pre'}
               injuries={KANBAN_INJURIES}
@@ -417,7 +589,7 @@ export default function CaseDemoDetail() {
           </div>
         </section>
 
-        {/* Section 5 — return link */}
+        {/* Section 6 — return link */}
         <div className="flex justify-center pb-8">
           <button
             type="button"
@@ -434,12 +606,376 @@ export default function CaseDemoDetail() {
 }
 
 // ---------------------------------------------------------------------------
+// Call Score Hero
+// ---------------------------------------------------------------------------
+
+function CallScoreHero({
+  call,
+  overall,
+  allCalls,
+  audioPlaying,
+}: {
+  call: Call
+  overall: number
+  allCalls: Call[]
+  audioPlaying: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const tier = tierClasses(overall)
+
+  // Trend chip: scores over time, oldest → newest.
+  const trend = [...allCalls]
+    .sort((a, b) => a.dateSort - b.dateSort)
+    .map((c) => overallScore(c.scores))
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="rounded-lg border border-border bg-card">
+        {/* Collapsed banner body */}
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-5 p-5">
+          {/* Left: big score */}
+          <div className="flex items-baseline gap-1.5">
+            <span
+              className={cn(
+                'font-mono text-[40px] font-semibold leading-none tabular-nums',
+                tier.text,
+              )}
+            >
+              {overall}
+            </span>
+            <span className="font-mono text-[14px] text-muted-foreground">
+              / 100
+            </span>
+          </div>
+
+          {/* Middle: call meta + sparkline + trend chip */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {trend.length > 1 && <TrendChip values={trend} />}
+              {audioPlaying && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-[#5B8CFF]">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#5B8CFF]" />
+                  scoring live
+                </span>
+              )}
+            </div>
+            <div className="mt-1.5 flex items-center gap-3">
+              <div className="min-w-0 truncate text-[13px] font-medium text-foreground">
+                {call.callType} · {call.duration} · {call.participants} ·{' '}
+                {call.date.replace('Today · ', '')}
+              </div>
+              <DimensionSparkline scores={call.scores} />
+            </div>
+          </div>
+
+          {/* Right: chevron toggle */}
+          <CollapsibleTrigger
+            render={
+              <button
+                type="button"
+                aria-label={open ? 'Collapse score details' : 'Expand score details'}
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 transition-transform duration-150',
+                    open && 'rotate-180',
+                  )}
+                />
+              </button>
+            }
+          />
+        </div>
+
+        {/* Expanded detail panel — CSS max-height transition */}
+        <CollapsibleContent
+          className="overflow-hidden transition-[max-height] duration-300 ease-out data-[starting-style]:max-h-0 data-[ending-style]:max-h-0 data-[open]:max-h-[1600px] data-[closed]:max-h-0"
+          keepMounted
+        >
+          <div className="border-t border-border p-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {ROW_ORDER.map((key) => (
+                <DimensionRow key={key} label={ROW_LABELS[key]} dim={call.scores[key]} />
+              ))}
+              {call.extraDimensions?.map((d) => (
+                <DimensionRow
+                  key={d.key}
+                  label={d.label}
+                  dim={{ score: d.score, evidence_quote: d.evidence }}
+                />
+              ))}
+            </div>
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  )
+}
+
+// Small inline SVG sparkline: 4 bars, one per dimension.
+function DimensionSparkline({ scores }: { scores: CallScores }) {
+  const values = ROW_ORDER.map((k) => scores[k].score)
+  const width = 56
+  const height = 18
+  const barW = 10
+  const gap = 4
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      {values.map((v, i) => {
+        const h = Math.max(2, Math.round((v / 100) * height))
+        const x = i * (barW + gap)
+        const y = height - h
+        const fill =
+          v >= 90 ? 'var(--ring)' : v >= 70 ? '#2dd4bf' : '#fbbf24'
+        return (
+          <rect
+            key={i}
+            x={x}
+            y={y}
+            width={barW}
+            height={h}
+            rx={1}
+            fill={fill}
+            opacity={0.8}
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
+// Score-trend chip. `74 → 88 → 96 ↗`.
+function TrendChip({ values }: { values: number[] }) {
+  if (values.length < 2) return null
+  const first = values[0]
+  const last = values[values.length - 1]
+  if (first === undefined || last === undefined) return null
+  const up = last > first
+  const down = last < first
+
+  return (
+    <span className="inline-flex h-5 items-center gap-1.5 rounded-full border border-border bg-background px-2">
+      <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+        {values.join(' → ')}
+      </span>
+      {up && (
+        <span className="inline-flex items-center gap-0.5 text-emerald-300">
+          <TrendingUp className="h-3 w-3" />
+        </span>
+      )}
+      {down && (
+        <span className="text-[11px] text-amber-300">↘</span>
+      )}
+    </span>
+  )
+}
+
+// One dimension row inside the expanded hero: label, score, progress, quote,
+// and a per-dimension "Why this score?" Collapsible.
+function DimensionRow({
+  label,
+  dim,
+}: {
+  label: string
+  dim: { score: number; evidence_quote: string }
+}) {
+  const [why, setWhy] = useState(false)
+  const tier = tierClasses(dim.score)
+
+  return (
+    <div className="rounded-md border border-border bg-background p-3">
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
+        </div>
+        <span
+          className={cn(
+            'font-mono text-[12px] font-semibold tabular-nums',
+            tier.text,
+          )}
+        >
+          {dim.score}
+        </span>
+      </div>
+      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-border">
+        <div
+          className={cn('h-full rounded-full transition-all', tier.bar)}
+          style={{ width: `${Math.max(2, Math.min(100, dim.score))}%` }}
+        />
+      </div>
+      <blockquote className="mt-2 border-l-2 border-ring/40 pl-3 text-[12px] italic text-muted-foreground">
+        &ldquo;{dim.evidence_quote}&rdquo;
+      </blockquote>
+
+      <Collapsible open={why} onOpenChange={setWhy}>
+        <CollapsibleTrigger
+          render={
+            <button
+              type="button"
+              className="mt-2 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {why ? 'Hide reasoning' : 'Why this score?'}
+            </button>
+          }
+        />
+        <CollapsibleContent
+          className="overflow-hidden transition-[max-height] duration-200 ease-out data-[open]:max-h-64 data-[closed]:max-h-0"
+          keepMounted
+        >
+          <div className="mt-2 rounded-md border border-border bg-ring/10 p-2.5 text-[12px] text-foreground">
+            Score reflects how fully the rep hit this rubric dimension.
+            Deductions apply for missed required fields, skipped disclosures,
+            or tone mismatches. See rubric v8 for full weighting.
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Call Stack (accordion of all calls)
+// ---------------------------------------------------------------------------
+
+function CallStack({
+  calls,
+  onCurrentComplete,
+  onCurrentPlayingChange,
+}: {
+  calls: Call[]
+  onCurrentComplete: () => void
+  onCurrentPlayingChange: (playing: boolean) => void
+}) {
+  // Default-expanded: the first (newest) call.
+  const firstId = calls[0]?.id
+  const defaultValue = firstId ? [firstId] : []
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <Accordion defaultValue={defaultValue}>
+        {calls.map((c, i) => {
+          const overall = overallScore(c.scores)
+          const tier = tierClasses(overall)
+          const isFirst = i === 0
+
+          return (
+            <AccordionItem
+              key={c.id}
+              value={c.id}
+              className={cn(
+                'border-b border-border last:border-b-0',
+                isFirst && 'bg-ring/5',
+              )}
+            >
+              <AccordionTrigger
+                className={cn(
+                  'h-14 items-center px-4 text-[13px] font-medium text-foreground transition-colors hover:bg-background/40 hover:no-underline',
+                )}
+              >
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                    {c.date}
+                  </span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="truncate text-foreground">{c.callType}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                    {c.duration}
+                  </span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-muted-foreground">{c.participants}</span>
+                  <span className="ml-auto inline-flex items-center gap-1">
+                    <span className="text-[11px] text-muted-foreground">
+                      Score
+                    </span>
+                    <span
+                      className={cn(
+                        'font-mono text-[13px] font-semibold tabular-nums',
+                        tier.text,
+                      )}
+                    >
+                      {overall}
+                    </span>
+                  </span>
+                </div>
+              </AccordionTrigger>
+
+              <AccordionContent className="px-4">
+                <CallRowContent
+                  call={c}
+                  onComplete={c.isCurrent ? onCurrentComplete : undefined}
+                  onPlayingChange={
+                    c.isCurrent ? onCurrentPlayingChange : undefined
+                  }
+                />
+              </AccordionContent>
+            </AccordionItem>
+          )
+        })}
+      </Accordion>
+    </div>
+  )
+}
+
+function CallRowContent({
+  call,
+  onComplete,
+  onPlayingChange,
+}: {
+  call: Call
+  onComplete?: () => void
+  onPlayingChange?: (playing: boolean) => void
+}) {
+  return (
+    <div className="space-y-4 pb-4">
+      {call.audioUrl ? (
+        <CallPlayer
+          src={call.audioUrl}
+          title={`${call.callType} · ${call.duration} · ${call.participants}`}
+          durationLabel={call.duration}
+          segments={call.transcript}
+          onComplete={onComplete}
+          onPlayingChange={onPlayingChange}
+          className="h-[420px]"
+        />
+      ) : (
+        <div className="rounded-md border border-dashed border-border bg-background p-6 text-center">
+          <div className="text-[12px] text-muted-foreground">
+            No audio recording available for this call.
+          </div>
+          <div className="mt-1 text-[11px] text-muted-foreground/80">
+            Score card below is reconstructed from legacy notes.
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {ROW_ORDER.map((key) => (
+          <DimensionRow
+            key={key}
+            label={ROW_LABELS[key]}
+            dim={call.scores[key]}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Small pieces
 // ---------------------------------------------------------------------------
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+    <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
       {children}
     </div>
   )
@@ -476,11 +1012,6 @@ function StatChip({
   )
 }
 
-// State-aware chip. Before play → neutral "Ready" with pause icon. While
-// audio playing → pulsing green dot + "LIVE · scoring in real time". After
-// audio ends → green check + "Scoring complete — 96 / 100". Also injects
-// the keyframes for the subtle "animate-live-ring" applied to the newest
-// item card while audio is playing.
 function StatusChip({
   scored,
   audioPlaying,
@@ -527,9 +1058,6 @@ function StatusChip({
         </>
       )}
 
-      {/* Keyframes for the subtle 1px border-ring animation on the newest
-          item while audio is playing. Inline <style> keeps this page
-          self-contained rather than polluting global CSS. */}
       <style>{`@keyframes cp-live-ring {
         0%,100% { box-shadow: 0 0 0 0 rgba(91, 140, 255, 0); }
         50% { box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.45); }
@@ -555,41 +1083,5 @@ function OwnerBadge({ owner }: { owner: Owner }) {
     >
       {owner}
     </span>
-  )
-}
-
-function ExtraRow({ d }: { d: ExtraDimension }) {
-  const tier =
-    d.score >= 90
-      ? { bar: 'bg-[#5B8CFF]/70', text: 'text-[#5B8CFF]' }
-      : d.score >= 70
-        ? { bar: 'bg-teal-400/70', text: 'text-teal-300' }
-        : { bar: 'bg-amber-400/70', text: 'text-amber-300' }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          {d.label}
-        </div>
-        <span
-          className={cn(
-            'font-mono text-[12px] font-semibold tabular-nums',
-            tier.text,
-          )}
-        >
-          {d.score}
-        </span>
-      </div>
-      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-border">
-        <div
-          className={cn('h-full rounded-full transition-all', tier.bar)}
-          style={{ width: `${Math.max(2, Math.min(100, d.score))}%` }}
-        />
-      </div>
-      <blockquote className="mt-2 border-l-2 border-[#5B8CFF]/40 pl-3 text-[12px] italic text-muted-foreground">
-        &ldquo;{d.evidence}&rdquo;
-      </blockquote>
-    </div>
   )
 }

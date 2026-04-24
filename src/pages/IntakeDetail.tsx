@@ -28,7 +28,7 @@ import {
 } from '@/lib/intakeUtils'
 import { CallScoreCard } from '@/components/intake/CallScoreCard'
 import type { CallScores } from '@/components/intake/CallScoreCard'
-import type { ReasoningBullet, ReasoningTag } from '@/components/intake/VerdictCard'
+import type { ReasoningBullet } from '@/components/intake/VerdictCard'
 import { TranscriptViewer } from '@/components/intake/TranscriptViewer'
 import type { TranscriptSegment } from '@/components/intake/TranscriptViewer'
 import { AgreementCard } from '@/components/intake/AgreementCard'
@@ -274,16 +274,6 @@ const CHECKLIST_ITEMS = [
   { section: 'Coverage', items: ['Client insurance', 'PIP', 'UM/UIM', 'Prior MVA history'] },
   { section: 'Closing', items: ['No prior rep', 'No adjuster statements', 'Next steps explained'] },
 ]
-
-const TAG_TINTS: Record<ReasoningTag, string> = {
-  // Neutral labels across the board. Category is conveyed by a 6px dot, not
-  // by a colored background. Keeps the card from looking like a toolbar.
-  DECISION: 'text-muted-foreground',
-  FIT: 'text-muted-foreground',
-  SIGNAL: 'text-muted-foreground',
-  RISK: 'text-muted-foreground',
-  ACTION: 'text-muted-foreground',
-}
 
 // ---------------------------------------------------------------------------
 // Page
