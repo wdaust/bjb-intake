@@ -352,7 +352,7 @@ export default function CallQueue() {
       {/* Top bar */}
       <div
         className={cn(
-          'sticky top-12 z-20 flex h-10 items-center justify-between border-b border-border px-4',
+          'sticky top-12 z-40 flex h-10 items-center justify-between border-b border-border px-4',
           'bg-background',
         )}
       >
@@ -377,7 +377,7 @@ export default function CallQueue() {
       {/* Filter bar */}
       <div
         className={cn(
-          'sticky top-[88px] z-10 flex h-11 items-center gap-3 border-b border-border px-4',
+          'sticky top-[88px] z-30 flex h-11 items-center gap-3 border-b border-border px-4',
           'bg-background',
         )}
       >
@@ -523,10 +523,15 @@ function QueueRow({
     isDragging,
   } = useSortable({ id: c.id })
 
+  // While dragging, lift to z-20 so the ghost is visible above its
+  // siblings — but stays below the sticky bars (which are z-30/z-40)
+  // so it can't cover the header or filter row.
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 20 : undefined,
+    position: isDragging ? 'relative' : undefined,
   }
 
   const [snoozeOpen, setSnoozeOpen] = useState(false)

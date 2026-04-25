@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowUpRight,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Clock,
   ListPlus,
   Pause,
   TrendingUp,
@@ -33,6 +35,7 @@ import {
   DEMO_EVENTS,
 } from '@/components/treatment/TreatmentKanban'
 import type { TreatmentEvent, Injury } from '@/lib/treatmentUtils'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { resolveCaseTrack } from '@/lib/caseTrack'
 import type { CaseForRanking } from '@/lib/callQueueRanker'
 import { TrackChip } from '@/components/case/TrackChip'
@@ -490,6 +493,12 @@ export default function CaseDemoDetail() {
                     Active Treatment
                   </span>
                   <DemoTrackChip />
+                  <span
+                    className="inline-flex h-5 items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 font-mono text-[10px] font-medium tracking-wider text-amber-300"
+                    title="This page renders fixture data for Maria regardless of leadId."
+                  >
+                    DEMO
+                  </span>
                   <button
                     type="button"
                     onClick={() => navigate('/intake/INT-260212225483')}
@@ -526,6 +535,33 @@ export default function CaseDemoDetail() {
       </header>
 
       <main className="mx-auto max-w-[1180px] px-6 py-6">
+        <Tabs defaultValue="overview" className="space-y-5">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="calls">Calls · {CALLS_SORTED.length}</TabsTrigger>
+            <TabsTrigger value="treatment">Treatment</TabsTrigger>
+            <TabsTrigger value="updates">Updates</TabsTrigger>
+          </TabsList>
+
+          {/* Overview — at-a-glance summary across all sources */}
+          <TabsContent value="overview">
+            <CaseOverviewTab
+              currentCall={currentCall}
+              currentOverall={currentOverall}
+              allCalls={CALLS_SORTED}
+              postCallEvents={scored ? POST_CALL_EVENTS : PRE_CALL_EVENTS}
+              injuries={KANBAN_INJURIES}
+              actionItems={ACTION_ITEMS}
+              redSignals={MARIA_CASE_FOR_RANKING.redSignals}
+              nextAction={MARIA_CASE_FOR_RANKING.openAction ?? 'No open action'}
+              daysSinceLastContact={1}
+              slaCountdown="3h 14m"
+              solCountdown="364d"
+            />
+          </TabsContent>
+
+          {/* Calls — score hero + multi-call accordion */}
+          <TabsContent value="calls" className="space-y-5">
         {/* Section 2 — Call Score hero (collapsible) */}
         <section className="mb-5">
           <CallScoreHero
@@ -550,6 +586,10 @@ export default function CaseDemoDetail() {
             onCurrentPlayingChange={setAudioPlaying}
           />
         </section>
+          </TabsContent>
+
+          {/* Updates — post-call AI extracted updates + action items */}
+          <TabsContent value="updates">
 
         {/* Section 4 — post-call AI output (updates + action items) */}
         <section className="mb-5">
@@ -642,7 +682,10 @@ export default function CaseDemoDetail() {
             </div>
           </div>
         </section>
+          </TabsContent>
 
+          {/* Treatment — Kanban progression */}
+          <TabsContent value="treatment">
         {/* Section 5 — treatment progression kanban (untouched) */}
         <section className="mb-4">
           <SectionLabel>Treatment progression</SectionLabel>
@@ -654,6 +697,8 @@ export default function CaseDemoDetail() {
             />
           </div>
         </section>
+          </TabsContent>
+        </Tabs>
 
         {/* Section 6 — return link */}
         <div className="flex justify-center pb-8">
@@ -1149,6 +1194,326 @@ function OwnerBadge({ owner }: { owner: Owner }) {
     >
       {owner}
     </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Overview tab — at-a-glance summary across all sources
+// ---------------------------------------------------------------------------
+
+interface CaseOverviewTabProps {
+  currentCall: Call
+  currentOverall: number
+  allCalls: Call[]
+  postCallEvents: TreatmentEvent[]
+  injuries: Injury[]
+  actionItems: ActionItem[]
+  redSignals: string[]
+  nextAction: string
+  daysSinceLastContact: number
+  slaCountdown: string | null
+  solCountdown: string | null
+}
+
+function CaseOverviewTab({
+  currentCall,
+  currentOverall,
+  allCalls,
+  postCallEvents,
+  injuries,
+  actionItems,
+  redSignals,
+  nextAction,
+  daysSinceLastContact,
+  slaCountdown,
+  solCountdown,
+}: CaseOverviewTabProps) {
+  const tier = tierClasses(currentOverall)
+  const trackInfo = resolveCaseTrack(MARIA_CASE_FOR_RANKING, 'default')
+
+  const upcomingEvents = postCallEvents
+    .filter((e) => e.status === 'scheduled' && e.scheduledDate)
+    .sort((a, b) =>
+      String(a.scheduledDate).localeCompare(String(b.scheduledDate)),
+    )
+    .slice(0, 3)
+
+  const pendingOrder = postCallEvents
+    .filter((e) => e.status === 'recommended')
+    .slice(0, 3)
+
+  // Top 3 action items — owner=CM first (we drive those), then Client.
+  const topActions = [...actionItems]
+    .sort((a, b) => ownerWeight(b.owner) - ownerWeight(a.owner))
+    .slice(0, 3)
+
+  // Score trend across all calls.
+  const trend = [...allCalls]
+    .sort((a, b) => a.dateSort - b.dateSort)
+    .map((c) => overallScore(c.scores))
+
+  return (
+    <div className="space-y-4">
+      {/* HERO — track + reason + next action */}
+      <div className="rounded-lg border border-border bg-card p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <TrackChip info={trackInfo} />
+          {redSignals.length > 0 &&
+            redSignals.slice(0, 2).map((sig) => (
+              <span
+                key={sig}
+                className="inline-flex h-6 items-center gap-1 rounded-full border border-amber-700/40 bg-amber-900/20 px-2 text-[11px] text-amber-300"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                {sig}
+              </span>
+            ))}
+          {slaCountdown && (
+            <span className="inline-flex h-6 items-center gap-1 rounded-full border border-red-700/40 bg-red-900/20 px-2 text-[11px] text-red-300">
+              <Clock className="h-3 w-3" />
+              SLA {slaCountdown}
+            </span>
+          )}
+        </div>
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Next action
+          </span>
+          <span className="text-[14px] font-medium text-foreground">
+            {nextAction}
+          </span>
+        </div>
+      </div>
+
+      {/* TWO-COLUMN BODY */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Left col (2/3) */}
+        <div className="space-y-4 lg:col-span-2">
+          {/* Latest call summary */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Latest call
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                {currentCall.callType} · {currentCall.date}
+              </span>
+            </div>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="flex items-baseline gap-1.5">
+                  <span
+                    className={cn(
+                      'font-mono text-[40px] font-semibold leading-none tabular-nums',
+                      tier.text,
+                    )}
+                  >
+                    {currentOverall}
+                  </span>
+                  <span className="text-[12px] text-muted-foreground">
+                    / 100
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] text-muted-foreground">
+                  {currentCall.participants} · {currentCall.duration}
+                </div>
+              </div>
+              {trend.length > 1 && <TrendChip values={trend} />}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <DimMini label="Info" score={currentCall.scores.information_capture.score} />
+              <DimMini label="Compliance" score={currentCall.scores.compliance.score} />
+              <DimMini label="Empathy" score={currentCall.scores.empathy.score} />
+              <DimMini label="Progression" score={currentCall.scores.call_progression.score} />
+            </div>
+          </div>
+
+          {/* Treatment phase strip — per-injury */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Treatment phase by injury
+            </div>
+            <ul className="space-y-2">
+              {injuries.map((inj) => (
+                <li key={inj.id} className="flex items-center gap-3">
+                  <span className="w-28 shrink-0 text-[12px] capitalize text-foreground">
+                    {inj.bodyRegion.replace(/_/g, ' ')}
+                  </span>
+                  <PhaseBar phase={inj.currentPhase} />
+                  <span className="w-24 shrink-0 text-right text-[11px] capitalize text-muted-foreground">
+                    {inj.currentPhase.replace(/_/g, ' ')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Open scheduling */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Open scheduling
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                {upcomingEvents.length} scheduled · {pendingOrder.length} pending order
+              </span>
+            </div>
+            {upcomingEvents.length + pendingOrder.length === 0 ? (
+              <p className="text-[12px] text-muted-foreground">
+                Nothing pending — case is clear.
+              </p>
+            ) : (
+              <ul className="space-y-1.5 text-[12px]">
+                {upcomingEvents.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between">
+                    <span className="text-foreground">{e.name ?? e.modality}</span>
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
+                      <span className="inline-flex h-5 items-center rounded-full border border-sky-700/40 bg-sky-900/30 px-1.5 text-[10px] text-sky-300">
+                        Scheduled
+                      </span>
+                      <span className="font-mono">{e.scheduledDate}</span>
+                    </span>
+                  </li>
+                ))}
+                {pendingOrder.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between">
+                    <span className="text-foreground">{e.name ?? e.modality}</span>
+                    <span className="inline-flex items-center gap-2 text-muted-foreground">
+                      <span className="inline-flex h-5 items-center rounded-full border border-amber-700/40 bg-amber-900/30 px-1.5 text-[10px] text-amber-300">
+                        Pending order
+                      </span>
+                      {e.providerName && (
+                        <span className="font-mono">{e.providerName}</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* Right col (1/3) — actions + clocks */}
+        <div className="space-y-4 lg:col-span-1">
+          {/* Top action items */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Top actions
+            </div>
+            <ul className="space-y-2 text-[12px]">
+              {topActions.map((a) => (
+                <li key={a.id} className="flex items-start gap-2">
+                  <OwnerBadge owner={a.owner} />
+                  <div className="min-w-0 flex-1">
+                    <div className="leading-snug text-foreground">{a.action}</div>
+                    <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                      due {a.due}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Clocks */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Clocks
+            </div>
+            <dl className="space-y-2 text-[12px]">
+              {slaCountdown && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">SLA</dt>
+                  <dd className="font-mono text-red-300">{slaCountdown}</dd>
+                </div>
+              )}
+              {solCountdown && (
+                <div className="flex items-center justify-between">
+                  <dt className="text-muted-foreground">Statute of limitations</dt>
+                  <dd className="font-mono text-foreground">{solCountdown}</dd>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <dt className="text-muted-foreground">Days since contact</dt>
+                <dd className="font-mono text-foreground">{daysSinceLastContact}d</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-muted-foreground">Calls on case</dt>
+                <dd className="font-mono text-foreground">{allCalls.length}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-muted-foreground">Injuries tracked</dt>
+                <dd className="font-mono text-foreground">{injuries.length}</dd>
+              </div>
+            </dl>
+          </div>
+
+          {/* Risk flags */}
+          {redSignals.length > 0 && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Risk flags
+              </div>
+              <ul className="space-y-1.5 text-[12px]">
+                {redSignals.map((s) => (
+                  <li key={s} className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-300" />
+                    <span className="text-foreground">{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ownerWeight(o: Owner): number {
+  return o === 'CM' ? 3 : o === 'Client' ? 2 : 1
+}
+
+function DimMini({ label, score }: { label: string; score: number }) {
+  const tier = tierClasses(score)
+  return (
+    <div>
+      <div className="mb-1 flex items-baseline justify-between">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        <span className={cn('font-mono text-[11px] tabular-nums', tier.text)}>
+          {score}
+        </span>
+      </div>
+      <div className="h-1 w-full overflow-hidden rounded-full bg-border">
+        <div
+          className={cn('h-full rounded-full', tier.bar)}
+          style={{ width: `${Math.max(2, score)}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+const PHASE_ORDER = ['conservative', 'imaging', 'pain_mgmt', 'surgical', 'mmi'] as const
+
+function PhaseBar({ phase }: { phase: string }) {
+  const idx = PHASE_ORDER.indexOf(phase as (typeof PHASE_ORDER)[number])
+  return (
+    <div className="flex flex-1 items-center gap-1">
+      {PHASE_ORDER.map((p, i) => (
+        <div
+          key={p}
+          className={cn(
+            'h-1.5 flex-1 rounded-full',
+            idx >= 0 && i <= idx ? 'bg-sky-500/70' : 'bg-border',
+          )}
+          title={p.replace(/_/g, ' ')}
+        />
+      ))}
+    </div>
   )
 }
 

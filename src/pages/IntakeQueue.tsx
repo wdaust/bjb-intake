@@ -351,7 +351,7 @@ export default function IntakeQueue({ leads = MOCK_LEADS }: IntakeQueueProps) {
 
         {/* Table */}
         <div className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
-          <div className="grid grid-cols-[minmax(220px,1.6fr)_70px_90px_110px_minmax(160px,1.2fr)_150px_110px_70px_120px] items-center gap-3 border-b border-border px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="grid grid-cols-[minmax(220px,1.6fr)_70px_90px_110px_minmax(200px,1.4fr)_150px_110px_70px_120px] items-center gap-3 border-b border-border px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <div>Lead</div>
             <div>State</div>
             <div>Source</div>
@@ -396,7 +396,7 @@ function LeadRow({ lead, onOpen }: { lead: IntakeLead; onOpen: () => void }) {
       onKeyDown={(e) => {
         if (e.key === 'Enter') onOpen()
       }}
-      className="group grid h-9 cursor-pointer grid-cols-[minmax(220px,1.6fr)_70px_90px_110px_minmax(160px,1.2fr)_150px_110px_70px_120px] items-center gap-3 border-b border-border px-4 text-[13px] hover:bg-accent/40 focus:bg-accent/40 focus:outline-none last:border-0"
+      className="group grid h-9 cursor-pointer grid-cols-[minmax(220px,1.6fr)_70px_90px_110px_minmax(200px,1.4fr)_150px_110px_70px_120px] items-center gap-3 border-b border-border px-4 text-[13px] hover:bg-accent/40 focus:bg-accent/40 focus:outline-none last:border-0"
     >
       {/* Name + case type */}
       <div className="min-w-0">
@@ -422,13 +422,14 @@ function LeadRow({ lead, onOpen }: { lead: IntakeLead; onOpen: () => void }) {
       </div>
 
       {/* Verdict */}
-      <div>
+      <div className="min-w-0">
         {lead.verdict ? (
           <span
             className={cn(
-              'inline-flex h-5 items-center rounded-full px-2 text-[11px] font-medium',
+              'inline-flex h-5 max-w-full items-center truncate whitespace-nowrap rounded-full px-2 text-[11px] font-medium',
               vStyle.badge,
             )}
+            title={lead.verdict}
           >
             {lead.verdict}
           </span>
