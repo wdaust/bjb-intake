@@ -8,6 +8,11 @@ import { useQueue } from '@/lib/QueueContext'
 import { CaseQueueSidebar } from '@/components/call/CaseQueueSidebar'
 import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView } from '@/types'
+import { useAuth } from '@/lib/AuthContext'
+import { resolveTrackForCaseView } from '@/lib/caseTrack'
+import { TrackChip } from '@/components/case/TrackChip'
+import { TrackPicker } from '@/components/case/TrackPicker'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const STAGE_LABELS: Record<string, string> = {
   early_case: 'Early Case',
@@ -259,8 +264,9 @@ function CaseSnapshotContent({ cv, navigate }: { cv: FullCaseView; navigate: Ret
         </Card>
 
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base">Case Snapshot</CardTitle>
+            <CaseTrackInline cv={cv} />
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-y-1.5 text-sm">
             <div><span className="text-muted-foreground">Matter:</span> {cv.caseData.matterId}</div>
@@ -430,5 +436,46 @@ function CaseSnapshotContent({ cv, navigate }: { cv: FullCaseView; navigate: Ret
         <Button variant="outline" disabled>Log Unable to Reach</Button>
       </div>
     </div>
+  )
+}
+
+function CaseTrackInline({ cv }: { cv: FullCaseView }) {
+  const { user } = useAuth()
+  const userKey = user?.uid || 'default'
+  const [open, setOpen] = useState(false)
+  const [revision, setRevision] = useState(0)
+
+  useEffect(() => {
+    function bump() { setRevision((r) => r + 1) }
+    window.addEventListener('caos:track-override', bump)
+    return () => window.removeEventListener('caos:track-override', bump)
+  }, [])
+
+  const info = resolveTrackForCaseView(cv, userKey)
+  // `revision` participates so the chip rerenders on override events.
+  void revision
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="outline-none"
+            title={info.isManualOverride ? `Set by CM: ${info.reason}` : `AI-derived: ${info.reason}`}
+          >
+            <TrackChip info={info} />
+          </button>
+        }
+      />
+      <PopoverContent align="end" className="w-auto p-2">
+        <TrackPicker
+          caseId={cv.caseData.id}
+          userKey={userKey}
+          current={info}
+          onClose={() => setOpen(false)}
+        />
+      </PopoverContent>
+    </Popover>
   )
 }

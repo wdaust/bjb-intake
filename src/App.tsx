@@ -15,6 +15,7 @@ import CaseDemoDetail from './pages/CaseDemoDetail'
 import Today from './pages/Today'
 import CallQueue from './pages/CallQueue'
 import CallQueueRun from './pages/CallQueueRun'
+import PendingTreatments from './pages/PendingTreatments'
 import { useAuth } from './lib/AuthContext'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -48,6 +49,7 @@ function App() {
         <Route path="/intake/:leadId" element={<IntakeDetail />} />
         <Route path="/queue" element={<CallQueue />} />
         <Route path="/queue/run" element={<CallQueueRun />} />
+        <Route path="/treatments" element={<PendingTreatments />} />
         <Route path="/case-demo/:leadId" element={<CaseDemoDetail />} />
         <Route path="/case/:caseId" element={<CaseSnapshot />} />
         <Route path="/call/:caseId" element={<GuidedCall />} />

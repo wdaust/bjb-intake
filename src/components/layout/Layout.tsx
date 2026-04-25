@@ -9,11 +9,13 @@ import {
   ChevronRight,
   ListChecks,
   LogOut,
+  Stethoscope,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/lib/AuthContext'
 import { useQueue } from '@/lib/QueueContext'
 import { CommandBar } from './CommandBar'
+import { MiniQueue } from './MiniQueue'
 import {
   Sidebar,
   SidebarContent,
@@ -79,6 +81,7 @@ function buildNavItems(queueBadge: number): NavItem[] {
       icon: Briefcase,
       matchPrefixes: ['/caseload', '/case/', '/call/', '/timeline/', '/summary/', '/case-demo/'],
     },
+    { label: 'Treatments', path: '/treatments', icon: Stethoscope, matchPrefixes: ['/treatments'] },
     { label: 'Manager', path: '/manager', icon: BarChart3, matchPrefixes: ['/manager'] },
     { label: 'Flow Builder', path: '/builder', icon: Workflow, matchPrefixes: ['/builder'] },
   ]
@@ -97,6 +100,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   manager: 'Manager',
   builder: 'Flow Builder',
   test: 'Demo Mode',
+  treatments: 'Treatments',
 }
 
 /** Root slug when the URL is "/". */
@@ -355,6 +359,12 @@ export function Layout() {
               })}
             </SidebarMenu>
           </SidebarGroup>
+
+          {/* Spacer so the mini queue sticks to the bottom-left above the user menu. */}
+          <div className="flex-1" />
+
+          {/* Mini live queue — bottom-left of the sidebar */}
+          <MiniQueue />
         </SidebarContent>
 
         {/* User */}

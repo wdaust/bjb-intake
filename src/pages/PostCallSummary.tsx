@@ -5,9 +5,11 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { getCaseByIdLive } from '@/data/liveData'
 import { useQueue } from '@/lib/QueueContext'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import type { FullCaseView } from '@/types'
 import type { CapturedCallData, CaseDirection, TaskItem } from '@/types'
+import { CallScoreCard } from '@/components/intake/CallScoreCard'
+import { scoreCmCall } from '@/lib/cmCallScoring'
 
 const DIRECTION_LABELS: Record<CaseDirection, string> = {
   continue_treatment_optimization: 'Continue Treatment Optimization',
@@ -191,6 +193,9 @@ export function PostCallSummary() {
         <Badge variant="secondary">Call Complete</Badge>
       </div>
 
+      {/* Call Score — 4 dim AI-style scoring of the just-completed call */}
+      <CallScoreSection capturedData={capturedData} />
+
       {/* What We Learned */}
       <Card>
         <CardHeader className="pb-2">
@@ -300,6 +305,13 @@ export function PostCallSummary() {
       </Card>
     </div>
   )
+}
+
+function CallScoreSection({ capturedData }: { capturedData: CapturedCallData }) {
+  const scores = useMemo(() => scoreCmCall(capturedData), [capturedData])
+  const hasAnyData = Object.values(capturedData).some((v) => v !== undefined && v !== '')
+  if (!hasAnyData) return null
+  return <CallScoreCard scores={scores} />
 }
 
 function NextCaseButton() {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -33,6 +33,11 @@ import {
   DEMO_EVENTS,
 } from '@/components/treatment/TreatmentKanban'
 import type { TreatmentEvent, Injury } from '@/lib/treatmentUtils'
+import { resolveCaseTrack } from '@/lib/caseTrack'
+import type { CaseForRanking } from '@/lib/callQueueRanker'
+import { TrackChip } from '@/components/case/TrackChip'
+import { TrackPicker } from '@/components/case/TrackPicker'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 // ---------------------------------------------------------------------------
 // Maria's CM call transcript — ~170wpm + 0.4s gap matches the seeded audio.
@@ -484,6 +489,7 @@ export default function CaseDemoDetail() {
                   <span className="inline-flex h-5 items-center rounded-full border border-[#5B8CFF]/20 bg-[#5B8CFF]/10 px-2 text-[11px] font-medium text-[#5B8CFF]">
                     Active Treatment
                   </span>
+                  <DemoTrackChip />
                   <button
                     type="button"
                     onClick={() => navigate('/intake/INT-260212225483')}
@@ -1143,5 +1149,60 @@ function OwnerBadge({ owner }: { owner: Owner }) {
     >
       {owner}
     </span>
+  )
+}
+
+// Maria's case shape for the track resolver. Mirrors the EXTRA_DEMO_CASES
+// fixture in CallQueue so overrides set on the queue page reflect here.
+const MARIA_CASE_FOR_RANKING: CaseForRanking = {
+  id: 'CASE-MARIA-SANTOS',
+  clientName: 'Maria Santos',
+  caseType: 'MVA',
+  estValue: 150_000,
+  slaDeadline: null,
+  lastContactAt: null,
+  lastTreatmentEventAt: null,
+  redSignals: ['Awaiting MRI authorization', 'Client hesitation on last call'],
+  openAction: 'Confirm MRI scheduling',
+  verdict: 'PURSUE-HARD',
+}
+
+function DemoTrackChip() {
+  const { user } = useAuth()
+  const userKey = user?.uid || 'default'
+  const [open, setOpen] = useState(false)
+  const [revision, setRevision] = useState(0)
+
+  useEffect(() => {
+    function bump() { setRevision((r) => r + 1) }
+    window.addEventListener('caos:track-override', bump)
+    return () => window.removeEventListener('caos:track-override', bump)
+  }, [])
+
+  void revision
+  const info = resolveCaseTrack(MARIA_CASE_FOR_RANKING, userKey)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="outline-none"
+            title={info.isManualOverride ? `Set by CM: ${info.reason}` : `AI-derived: ${info.reason}`}
+          >
+            <TrackChip info={info} />
+          </button>
+        }
+      />
+      <PopoverContent align="start" className="w-auto p-2">
+        <TrackPicker
+          caseId={MARIA_CASE_FOR_RANKING.id}
+          userKey={userKey}
+          current={info}
+          onClose={() => setOpen(false)}
+        />
+      </PopoverContent>
+    </Popover>
   )
 }

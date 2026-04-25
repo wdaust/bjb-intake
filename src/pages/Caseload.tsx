@@ -9,6 +9,9 @@ import { getAllCasesLive, getCaseManagers, searchCases, getCmStats, type CmStats
 import { useQueue, DEFAULT_CM_ID, DEFAULT_CM_NAME } from '@/lib/QueueContext'
 import { daysSince, daysUntil } from '@/data/mockData'
 import type { FullCaseView, SortCriteria } from '@/types'
+import { useAuth } from '@/lib/AuthContext'
+import { resolveTrackForCaseView } from '@/lib/caseTrack'
+import { TrackChip } from '@/components/case/TrackChip'
 
 const STAGE_LABELS: Record<string, string> = {
   early_case: 'Early Case',
@@ -131,6 +134,16 @@ export function Caseload() {
   const [pageSize, setPageSize] = useState(50)
 
   const { setQueue } = useQueue()
+  const { user } = useAuth()
+  const userKey = user?.uid || 'default'
+
+  // Re-resolve tracks when an override changes elsewhere (queue page picker).
+  const [trackRevision, setTrackRevision] = useState(0)
+  useEffect(() => {
+    function bump() { setTrackRevision((r) => r + 1) }
+    window.addEventListener('caos:track-override', bump)
+    return () => window.removeEventListener('caos:track-override', bump)
+  }, [])
   const [cmStats, setCmStats] = useState<CmStats>({ totalCases: 0, urgent: 0, gap14: 0, noRecentTreatment: 0 })
 
   // Load CM list on mount
@@ -379,6 +392,14 @@ export function Caseload() {
                     <p className="text-xs text-muted-foreground">{cv.client.state}</p>
                   </div>
 
+                  {/* Advancement Track — where this case is heading */}
+                  <div className="col-span-1">
+                    <TrackChip
+                      info={resolveTrackForCaseView(cv, userKey)}
+                      key={`track-${cv.caseData.id}-${trackRevision}`}
+                    />
+                  </div>
+
                   {/* Last Contact + Last Treatment */}
                   <div className="col-span-2">
                     <p className="text-xs">
@@ -415,7 +436,7 @@ export function Caseload() {
                   </div>
 
                   {/* Risk Flags */}
-                  <div className="col-span-2 flex flex-wrap gap-1">
+                  <div className="col-span-1 flex flex-wrap gap-1">
                     {riskFlags.slice(0, 3).map((flag, i) => (
                       <Badge
                         key={i}

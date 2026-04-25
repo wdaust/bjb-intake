@@ -24,9 +24,11 @@ import {
   Clock,
   DollarSign,
   GripVertical,
+  Info,
   MoreHorizontal,
   Play,
   Search,
+  Sparkles,
   TrendingDown,
   X,
 } from 'lucide-react'
@@ -59,6 +61,9 @@ import {
 } from '@/lib/callQueueRanker'
 import { useAuth } from '@/lib/AuthContext'
 import { cn } from '@/lib/utils'
+import { resolveCaseTrack } from '@/lib/caseTrack'
+import { TrackChip } from '@/components/case/TrackChip'
+import { TrackPicker } from '@/components/case/TrackPicker'
 
 // -----------------------------------------------------------------------------
 // Filter chips
@@ -154,6 +159,16 @@ export default function CallQueue() {
   // --- Rank once on mount --------------------------------------------------
   const ranked = useMemo<RankedCase[]>(() => {
     return rankCases(assembleCases(), new Date())
+  }, [])
+
+  // Track override revision — bumped via custom event so all rows re-resolve.
+  const [trackRevision, setTrackRevision] = useState(0)
+  useEffect(() => {
+    function onChange() {
+      setTrackRevision((r) => r + 1)
+    }
+    window.addEventListener('caos:track-override', onChange)
+    return () => window.removeEventListener('caos:track-override', onChange)
   }, [])
 
   // --- Filter state --------------------------------------------------------
@@ -338,7 +353,7 @@ export default function CallQueue() {
       <div
         className={cn(
           'sticky top-12 z-20 flex h-10 items-center justify-between border-b border-border px-4',
-          'bg-background/95 backdrop-blur-sm',
+          'bg-background',
         )}
       >
         <div className="flex items-center gap-2">
@@ -363,7 +378,7 @@ export default function CallQueue() {
       <div
         className={cn(
           'sticky top-[88px] z-10 flex h-11 items-center gap-3 border-b border-border px-4',
-          'bg-background/95 backdrop-blur-sm',
+          'bg-background',
         )}
       >
         <div className="flex flex-wrap items-center gap-1">
@@ -434,6 +449,9 @@ export default function CallQueue() {
         </div>
       </div>
 
+      {/* AI Queue Builder explainer (shows when AI sort active) */}
+      {sortKey === 'ai' && <AiBuilderBanner />}
+
       {/* Queue list */}
       <div className="flex-1 px-4 py-3">
         {visible.length === 0 ? (
@@ -451,6 +469,8 @@ export default function CallQueue() {
                     key={c.id}
                     ranked={c}
                     displayRank={i + 1}
+                    userKey={userKey}
+                    trackRevision={trackRevision}
                     onOpen={() => navigate(`/case-demo/${c.id}`)}
                     onSnooze={(d) => snoozeCase(c.id, d)}
                     onRemove={() => {
@@ -481,6 +501,8 @@ interface QueueRowProps {
   onOpen: () => void
   onSnooze: (until: Date) => void
   onRemove: () => void
+  userKey: string
+  trackRevision: number
 }
 
 function QueueRow({
@@ -489,6 +511,8 @@ function QueueRow({
   onOpen,
   onSnooze,
   onRemove,
+  userKey,
+  trackRevision,
 }: QueueRowProps) {
   const {
     attributes,
@@ -506,6 +530,13 @@ function QueueRow({
   }
 
   const [snoozeOpen, setSnoozeOpen] = useState(false)
+  const [trackOpen, setTrackOpen] = useState(false)
+  // Re-resolve track on revision bump so the chip reflects the new override.
+  const trackInfo = useMemo(
+    () => resolveCaseTrack(c, userKey),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [c, userKey, trackRevision],
+  )
 
   return (
     <li
@@ -544,15 +575,24 @@ function QueueRow({
         <GripVertical className="h-4 w-4" />
       </button>
 
-      {/* Rank chip */}
-      <span
-        className={cn(
-          'inline-flex h-6 w-8 shrink-0 items-center justify-center rounded-md font-mono text-[11px]',
-          tierChipClass(c.priorityTier),
-        )}
-      >
-        #{displayRank}
-      </span>
+      {/* Rank chip + AI score */}
+      <div className="flex shrink-0 items-center gap-1.5">
+        <span
+          className={cn(
+            'inline-flex h-6 w-8 items-center justify-center rounded-md font-mono text-[11px]',
+            tierChipClass(c.priorityTier),
+          )}
+        >
+          #{displayRank}
+        </span>
+        <span
+          className="inline-flex h-6 items-center gap-1 rounded-md border border-border bg-card px-1.5 font-mono text-[10px] text-muted-foreground"
+          title={`AI score: ${c.aiScore}/100 (priority: ${c.priorityTier})`}
+        >
+          <Sparkles className="h-3 w-3 text-ring" />
+          {c.aiScore}
+        </span>
+      </div>
 
       {/* Avatar */}
       <Avatar className="h-7 w-7 shrink-0 rounded-full">
@@ -570,6 +610,42 @@ function QueueRow({
           {c.id}
         </div>
       </div>
+
+      {/* Track chip — where this case is heading. Click to override. */}
+      <Popover open={trackOpen} onOpenChange={setTrackOpen}>
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              data-row-control
+              onClick={(e) => {
+                e.stopPropagation()
+                setTrackOpen(true)
+              }}
+              className="shrink-0 outline-none"
+              title={
+                trackInfo.isManualOverride
+                  ? `Set by CM: ${trackInfo.reason}`
+                  : `AI-derived: ${trackInfo.reason}`
+              }
+            >
+              <TrackChip info={trackInfo} />
+            </button>
+          }
+        />
+        <PopoverContent
+          align="start"
+          className="w-auto p-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <TrackPicker
+            caseId={c.id}
+            userKey={userKey}
+            current={trackInfo}
+            onClose={() => setTrackOpen(false)}
+          />
+        </PopoverContent>
+      </Popover>
 
       {/* Reason chips */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -626,6 +702,49 @@ function QueueRow({
         </DropdownMenu>
       </div>
     </li>
+  )
+}
+
+// -----------------------------------------------------------------------------
+// AI Queue Builder banner — explains how the AI ordered the list
+// -----------------------------------------------------------------------------
+
+const AI_WEIGHT_LEGEND: { label: string; pct: number; tone: string }[] = [
+  { label: 'SLA urgency', pct: 35, tone: 'text-red-300' },
+  { label: 'Case value', pct: 20, tone: 'text-emerald-300' },
+  { label: 'Stale contact', pct: 15, tone: 'text-amber-300' },
+  { label: 'Treatment gap', pct: 15, tone: 'text-sky-300' },
+  { label: 'Client risk', pct: 10, tone: 'text-violet-300' },
+  { label: 'Momentum', pct: 5, tone: 'text-muted-foreground' },
+]
+
+function AiBuilderBanner() {
+  return (
+    <div className="border-b border-border bg-card/40 px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+        <span className="inline-flex items-center gap-1 rounded-full border border-ring/40 bg-ring/10 px-2 py-0.5 text-ring">
+          <Sparkles className="h-3 w-3" />
+          <span className="font-medium">AI Queue Builder</span>
+        </span>
+        <span className="text-muted-foreground">
+          Ranked by signals — drag any row to override.
+        </span>
+        <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1">
+          {AI_WEIGHT_LEGEND.map((w) => (
+            <span key={w.label} className="inline-flex items-center gap-1">
+              <span className={cn('font-mono text-[10px]', w.tone)}>
+                {w.pct}%
+              </span>
+              <span className="text-muted-foreground">{w.label}</span>
+            </span>
+          ))}
+          <Info
+            className="h-3 w-3 text-muted-foreground"
+            aria-label="Hover any row's score for breakdown"
+          />
+        </div>
+      </div>
+    </div>
   )
 }
 

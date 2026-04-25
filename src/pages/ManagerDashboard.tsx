@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { getManagerStats, type ManagerStats } from '@/data/liveData'
+import { DailyCmReport } from '@/components/manager/DailyCmReport'
 
 const SEVERITY_COLORS = {
   low: 'bg-blue-100 text-blue-800',
@@ -41,6 +43,18 @@ export function ManagerDashboard() {
           Full portfolio overview — {stats.totalCases.toLocaleString()} open PI cases
         </p>
       </div>
+
+      <Tabs defaultValue="portfolio" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+          <TabsTrigger value="daily">Daily CM Report</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="daily">
+          <DailyCmReport />
+        </TabsContent>
+
+        <TabsContent value="portfolio" className="space-y-6">
 
       {/* Top-Level Metrics */}
       <div className="grid grid-cols-5 gap-4">
@@ -173,6 +187,9 @@ export function ManagerDashboard() {
           </div>
         </CardContent>
       </Card>
+
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
